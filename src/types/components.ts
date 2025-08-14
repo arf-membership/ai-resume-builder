@@ -2,8 +2,8 @@
  * Component prop types and UI-related interfaces
  */
 
-import { CVAnalysisResult, CVSection } from './cv';
-import { ChatMessage } from './api';
+import type { CVAnalysisResult, CVSection } from './cv';
+import type { ChatMessage } from './api';
 
 // Upload component props
 export interface UploadZoneProps {

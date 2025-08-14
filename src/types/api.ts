@@ -2,8 +2,7 @@
  * API response and request types
  */
 
-import { CVAnalysisResult, CVSection } from './cv';
-import { ResumeRecord } from './database';
+import type { CVAnalysisResult, CVSection } from './cv';
 
 // Generic API response wrapper
 export interface ApiResponse<T = any> {

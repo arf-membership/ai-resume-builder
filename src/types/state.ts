@@ -2,8 +2,8 @@
  * Application state management types
  */
 
-import { CVAnalysisResult } from './cv';
-import { ResumeRecord } from './database';
+import type { CVAnalysisResult } from './cv';
+import type { ResumeRecord } from './database';
 
 export interface ErrorState {
   id: string;

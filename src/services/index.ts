@@ -1,2 +1,3 @@
 // Export all services from this file
-// Example: export * from './uploadService'
+export { SessionStorageService } from './sessionStorage';
+export type { SessionData } from './sessionStorage';
