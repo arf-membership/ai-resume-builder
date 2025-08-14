@@ -35,14 +35,14 @@
 
 - [x] 5. Create landing page and upload components
 
-
   - Build LandingPage component with hero section and platform explanation
   - Implement UploadZone component with drag-and-drop functionality
   - Add file validation for PDF type and size restrictions
   - Create upload progress indicators and error handling
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 9.1_
 
-- [ ] 6. Implement PDF upload to Supabase Storage
+- [x] 6. Implement PDF upload to Supabase Storage
+
 
   - Create file upload service with Supabase Storage integration
   - Implement progress tracking for file uploads

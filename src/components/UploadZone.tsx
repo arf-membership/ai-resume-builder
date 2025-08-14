@@ -6,6 +6,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { UploadZoneProps } from '../types';
 import { ProgressIndicator } from './ProgressIndicator';
+import { UploadService, type UploadProgress } from '../services';
+import { useSession } from '../contexts/SessionContext';
 
 // File validation constants
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -22,6 +24,9 @@ export function UploadZone({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  const { sessionId } = useSession();
 
   /**
    * Validate uploaded file
@@ -52,32 +57,46 @@ export function UploadZone({
   };
 
   /**
-   * Simulate file upload (replace with actual Supabase upload later)
+   * Upload file to Supabase Storage
    */
   const uploadFile = async (file: File): Promise<{ resumeId: string; filePath: string }> => {
-    return new Promise((resolve) => {
-      // Simulate upload progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 20;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-          
-          // Simulate successful upload
-          setTimeout(() => {
-            resolve({
-              resumeId: `resume_${Date.now()}`,
-              filePath: `uploads/${file.name}`
-            });
-          }, 500);
-        }
-        
-        setUploadProgress(progress);
-        onUploadProgress(progress);
-      }, 200);
-    });
+    if (!sessionId) {
+      throw new Error('No session available. Please refresh the page and try again.');
+    }
+
+    // Create abort controller for this upload
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const result = await UploadService.uploadPDF(file, sessionId, {
+        onProgress: (progress: UploadProgress) => {
+          setUploadProgress(progress.percentage);
+          onUploadProgress(progress.percentage);
+        },
+        signal: abortController.signal,
+      });
+
+      return {
+        resumeId: result.resumeId,
+        filePath: result.filePath,
+      };
+    } finally {
+      abortControllerRef.current = null;
+    }
   };
+
+  /**
+   * Cancel current upload
+   */
+  const cancelUpload = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsUploading(false);
+    setUploadProgress(0);
+  }, []);
 
   /**
    * Handle file processing
@@ -99,13 +118,21 @@ export function UploadZone({
       const result = await uploadFile(file);
       onUploadComplete(result);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Upload failed. Please try again.';
-      onError(errorMessage);
+      // Handle different error types
+      if (error instanceof Error) {
+        if (error.message.includes('cancelled')) {
+          // Upload was cancelled by user - don't show error
+          return;
+        }
+        onError(error.message);
+      } else {
+        onError('Upload failed. Please try again.');
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [disabled, isUploading, onUploadComplete, onUploadProgress, onError]);
+  }, [disabled, isUploading, onUploadComplete, onUploadProgress, onError, uploadFile]);
 
   /**
    * Handle drag events
@@ -247,12 +274,22 @@ export function UploadZone({
 
       {/* Progress Indicator */}
       {isUploading && (
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
           <ProgressIndicator
             progress={uploadProgress}
             status="uploading"
             message="Uploading your CV..."
           />
+          
+          {/* Cancel Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={cancelUpload}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              Cancel Upload
+            </button>
+          </div>
         </div>
       )}
     </div>
