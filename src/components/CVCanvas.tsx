@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import type { CVCanvasProps } from '../types/components';
+import { usePDFGeneration } from '../hooks/usePDFGeneration';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -18,7 +19,9 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
   pdfUrl,
   updates = [],
   onDownload,
-  className = ''
+  className = '',
+  resumeId,
+  sessionId
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<CVCanvasState>({
@@ -28,6 +31,18 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
     isLoading: true,
     error: null,
     containerWidth: 0
+  });
+
+  // PDF generation hook
+  const pdfGeneration = usePDFGeneration({
+    resumeId: resumeId || '',
+    sessionId: sessionId || '',
+    onSuccess: (pdfUrl) => {
+      console.log('PDF generated successfully:', pdfUrl);
+    },
+    onError: (error) => {
+      console.error('PDF generation failed:', error);
+    }
   });
 
   // Handle container resize for responsive layout
@@ -128,6 +143,28 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
     }));
   }, []);
 
+  // Handle download button click
+  const handleDownload = useCallback(async () => {
+    if (onDownload) {
+      // Use custom download handler if provided
+      onDownload();
+    } else if (resumeId && sessionId) {
+      // Use PDF generation service
+      try {
+        await pdfGeneration.generateAndDownload(updates);
+      } catch (error) {
+        console.error('Download failed:', error);
+      }
+    }
+  }, [onDownload, resumeId, sessionId, updates, pdfGeneration]);
+
+  // Check for existing generated PDF on mount
+  useEffect(() => {
+    if (resumeId && sessionId) {
+      pdfGeneration.checkExistingPDF();
+    }
+  }, [resumeId, sessionId]);
+
   if (state.error) {
     return (
       <div className={`flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 ${className}`}>
@@ -214,15 +251,60 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
 
         {/* Download button */}
         <button
-          onClick={onDownload}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          onClick={handleDownload}
+          disabled={pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="hidden sm:inline">Download PDF</span>
+          {pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          )}
+          <span className="hidden sm:inline">
+            {pdfGeneration.state.isGenerating ? 'Generating...' : 
+             pdfGeneration.state.isDownloading ? 'Downloading...' : 
+             'Download PDF'}
+          </span>
         </button>
       </div>
+
+      {/* PDF Generation Progress */}
+      {pdfGeneration.state.progress && (
+        <div className="px-4 py-2 bg-blue-50 border-b">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-blue-700">{pdfGeneration.state.progress.stage}</span>
+            <span className="text-blue-600">{Math.round(pdfGeneration.state.progress.percentage)}%</span>
+          </div>
+          <div className="mt-1 w-full bg-blue-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${pdfGeneration.state.progress.percentage}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Generation Error */}
+      {pdfGeneration.state.error && (
+        <div className="px-4 py-2 bg-red-50 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-red-700 text-sm">{pdfGeneration.state.error}</span>
+            </div>
+            <button
+              onClick={pdfGeneration.clearError}
+              className="text-red-500 hover:text-red-700 text-sm"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* PDF viewer container */}
       <div 

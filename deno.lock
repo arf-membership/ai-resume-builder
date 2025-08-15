@@ -86,6 +86,7 @@
         "npm:eslint@^9.33.0",
         "npm:globals@^16.3.0",
         "npm:jsdom@^26.1.0",
+        "npm:pdf-lib@^1.17.1",
         "npm:pdfjs-dist@^5.4.54",
         "npm:postcss@^8.5.6",
         "npm:react-dom@^19.1.1",

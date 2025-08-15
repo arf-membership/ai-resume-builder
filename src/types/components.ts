@@ -34,8 +34,10 @@ export interface SectionCardProps {
 export interface CVCanvasProps {
   pdfUrl: string;
   updates?: SectionUpdate[];
-  onDownload: () => void;
+  onDownload?: () => void;
   className?: string;
+  resumeId?: string;
+  sessionId?: string;
 }
 
 // Chat interface component props
