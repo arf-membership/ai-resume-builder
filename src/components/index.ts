@@ -11,3 +11,7 @@ export { ScoreDisplay } from './ScoreDisplay';
 export { OverallScoreDisplay } from './OverallScoreDisplay';
 export { ATSCompatibilityCard } from './ATSCompatibilityCard';
 export { AnalysisResultsDemo } from './AnalysisResultsDemo';
+
+// PDF Display Components
+export { default as CVCanvas } from './CVCanvas';
+export { CVCanvasDemo } from './CVCanvasDemo';

@@ -145,13 +145,54 @@ Run tests with:
 npm test -- src/components/__tests__/
 ```
 
+### CVCanvas
+Interactive PDF viewer component with zoom, navigation, and section update overlay features.
+
+**Props:**
+- `pdfUrl: string` - URL of the PDF file to display
+- `updates?: SectionUpdate[]` - Array of section updates to overlay on the PDF
+- `onDownload: () => void` - Callback when download button is clicked
+- `className?: string` - Additional CSS classes
+
+**Features:**
+- PDF rendering with react-pdf library
+- Page navigation controls (previous/next)
+- Zoom controls (in/out/reset) with responsive scaling
+- Section update overlays with visual indicators
+- Loading states and error handling
+- Responsive layout for mobile and desktop
+- Download functionality integration
+
+**Usage Example:**
+```tsx
+import { CVCanvas } from './components';
+
+const updates = [
+  {
+    sectionName: 'Experience',
+    newContent: 'Updated experience content',
+    position: { x: 50, y: 100, width: 300, height: 80 }
+  }
+];
+
+<CVCanvas
+  pdfUrl="https://example.com/resume.pdf"
+  updates={updates}
+  onDownload={() => console.log('Download PDF')}
+  className="h-full"
+/>
+```
+
 ## Demo
 
-Use the `AnalysisResultsDemo` component to see all components in action with sample data:
+Use the demo components to see all components in action with sample data:
 
 ```tsx
-import { AnalysisResultsDemo } from './components';
+import { AnalysisResultsDemo, CVCanvasDemo } from './components';
 
 // Renders a complete demo with sample analysis data
 <AnalysisResultsDemo />
+
+// Renders PDF canvas demo with interactive features
+<CVCanvasDemo />
 ```
