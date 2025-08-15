@@ -1,33 +1,35 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { AnalysisResultsProps } from '../types';
 import { OverallScoreDisplay } from './OverallScoreDisplay';
 import { SectionCard } from './SectionCard';
 import { ATSCompatibilityCard } from './ATSCompatibilityCard';
+import { useSectionEdit } from '../hooks/useSectionEdit';
 
 /**
  * AnalysisResults component with split-screen layout for displaying CV analysis
  */
 export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
-  analysisData,
+  analysisData: initialAnalysisData,
   resumeId,
   onSectionEdit,
   onDownloadPDF
 }) => {
-  const [editingSections, setEditingSections] = useState<Set<string>>(new Set());
-
-  const handleSectionEdit = (sectionName: string) => {
-    setEditingSections(prev => new Set(prev).add(sectionName));
-    onSectionEdit(sectionName);
-    
-    // Remove from editing state after a delay (this would normally be handled by parent component)
-    setTimeout(() => {
-      setEditingSections(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(sectionName);
-        return newSet;
-      });
-    }, 3000);
-  };
+  const {
+    analysisData,
+    editingSections,
+    sectionUpdates,
+    error,
+    editSection,
+    clearError
+  } = useSectionEdit({
+    resumeId,
+    initialAnalysisData,
+    onSectionEdit,
+    onError: (error) => {
+      // You could integrate with a toast notification system here
+      console.error('Section editing error:', error);
+    }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,6 +56,28 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           {/* Left side - Analysis Results */}
           <div className="space-y-6 overflow-y-auto">
             
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <svg className="h-5 w-5 text-red-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-sm font-medium text-red-800">Section Editing Error</h3>
+                  <button
+                    onClick={clearError}
+                    className="ml-auto text-red-400 hover:text-red-600"
+                    aria-label="Close error"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
+            )}
+            
             {/* Overall Score Display */}
             <OverallScoreDisplay
               score={analysisData.overall_score}
@@ -72,17 +96,17 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 <SectionCard
                   key={`${section.section_name}-${index}`}
                   section={section}
-                  onEdit={() => handleSectionEdit(section.section_name)}
+                  onEdit={() => editSection(section.section_name)}
                   isEditing={editingSections.has(section.section_name)}
                 />
               ))}
             </div>
           </div>
 
-          {/* Right side - CV Canvas Placeholder */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6">
+          {/* Right side - CV Canvas */}
+          <div className="bg-white rounded-lg border-2 border-gray-200">
             <div className="h-full flex items-center justify-center">
-              <div className="text-center">
+              <div className="text-center p-6">
                 <svg
                   className="mx-auto h-16 w-16 text-gray-400 mb-4"
                   fill="none"
@@ -98,13 +122,26 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 </svg>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">CV Preview</h3>
                 <p className="text-gray-600 mb-4">
-                  Your CV will be displayed here once the CV Canvas component is implemented.
+                  Your CV will be displayed here with real-time updates as you edit sections.
                 </p>
                 <div className="bg-gray-100 rounded-lg p-8 text-gray-500">
                   <p className="text-sm">Resume ID: {resumeId}</p>
                   <p className="text-sm mt-2">
-                    This area will show your PDF with real-time updates as you edit sections.
+                    Section updates: {sectionUpdates.size} modified
                   </p>
+                  {sectionUpdates.size > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Updated sections:</p>
+                      {Array.from(sectionUpdates.keys()).map(sectionName => (
+                        <span 
+                          key={sectionName}
+                          className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1"
+                        >
+                          {sectionName.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
