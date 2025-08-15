@@ -25,6 +25,7 @@ export interface AnalysisResultsProps {
 export interface SectionCardProps {
   section: CVSection;
   onEdit: () => void;
+  onChatEdit?: () => void;
   isEditing?: boolean;
   disabled?: boolean;
 }

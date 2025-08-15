@@ -18,3 +18,7 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 vi.stubGlobal('localStorage', localStorageMock);
+
+// Mock DOM methods
+Element.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.focus = vi.fn();

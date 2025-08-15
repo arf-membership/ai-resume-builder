@@ -8,6 +8,7 @@ import { ScoreDisplay } from './ScoreDisplay';
 export const SectionCard: React.FC<SectionCardProps> = ({
   section,
   onEdit,
+  onChatEdit,
   isEditing = false,
   disabled = false
 }) => {
@@ -75,8 +76,27 @@ export const SectionCard: React.FC<SectionCardProps> = ({
         )}
       </div>
 
-      {/* Edit button */}
-      <div className="flex justify-end">
+      {/* Edit buttons */}
+      <div className="flex justify-end space-x-3">
+        {onChatEdit && (
+          <button
+            onClick={onChatEdit}
+            disabled={disabled || isEditing}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              disabled || isEditing
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
+            }`}
+          >
+            <div className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Chat with AI
+            </div>
+          </button>
+        )}
+        
         <button
           onClick={onEdit}
           disabled={disabled || isEditing}

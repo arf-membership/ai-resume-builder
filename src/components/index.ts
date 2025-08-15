@@ -12,6 +12,10 @@ export { OverallScoreDisplay } from './OverallScoreDisplay';
 export { ATSCompatibilityCard } from './ATSCompatibilityCard';
 export { AnalysisResultsDemo } from './AnalysisResultsDemo';
 
+// Chat Interface Components
+export { ChatInterface } from './ChatInterface';
+export { ChatInterfaceDemo } from './ChatInterfaceDemo';
+
 // PDF Display Components
 export { default as CVCanvas } from './CVCanvas';
 export { CVCanvasDemo } from './CVCanvasDemo';

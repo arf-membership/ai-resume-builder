@@ -196,3 +196,65 @@ import { AnalysisResultsDemo, CVCanvasDemo } from './components';
 // Renders PDF canvas demo with interactive features
 <CVCanvasDemo />
 ```
+
+## ChatInterface
+
+Interactive AI chat component for gathering additional information during CV section editing.
+
+### Features
+
+- **Modal popup design** - Non-intrusive overlay interface
+- **Real-time conversation** - Interactive chat with AI assistant
+- **Context-aware questions** - AI asks relevant questions based on section content
+- **Auto-completion** - Automatically generates improved content when enough information is gathered
+- **Error handling** - Graceful error handling with user-friendly messages
+- **Loading states** - Visual feedback during AI processing
+- **Keyboard support** - Enter to send, Shift+Enter for new lines
+
+### Usage
+
+```tsx
+import { ChatInterface } from './ChatInterface';
+
+<ChatInterface
+  isOpen={chatOpen}
+  sectionName="work_experience"
+  resumeId="resume-123"
+  onClose={() => setChatOpen(false)}
+  onComplete={(updatedContent) => {
+    // Handle the improved content
+    console.log('Updated content:', updatedContent);
+  }}
+/>
+```
+
+### Props
+
+- `isOpen: boolean` - Controls modal visibility
+- `sectionName: string` - Name of the CV section being edited
+- `resumeId: string` - ID of the resume being edited
+- `onClose: () => void` - Callback when chat is closed
+- `onComplete: (content: string) => void` - Callback with improved content
+- `initialMessages?: ChatMessage[]` - Optional initial conversation
+
+### Integration
+
+The ChatInterface integrates with:
+
+- **SectionCard** - "Chat with AI" button opens the interface
+- **AnalysisResults** - Manages chat state and section updates
+- **ChatService** - Handles API communication with Edge Functions
+- **useSectionEdit** - Provides state management for section editing
+
+### Edge Function
+
+The chat functionality is powered by the `chat-section` Edge Function which:
+
+- Initializes conversations with relevant questions
+- Processes user responses and asks follow-up questions
+- Generates improved content based on the conversation
+- Handles multiple conversation turns intelligently
+
+### Demo
+
+See `ChatInterfaceDemo.tsx` for a standalone demo of the chat interface.

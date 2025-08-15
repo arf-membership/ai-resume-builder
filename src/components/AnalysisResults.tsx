@@ -3,6 +3,7 @@ import type { AnalysisResultsProps } from '../types';
 import { OverallScoreDisplay } from './OverallScoreDisplay';
 import { SectionCard } from './SectionCard';
 import { ATSCompatibilityCard } from './ATSCompatibilityCard';
+import { ChatInterface } from './ChatInterface';
 import { useSectionEdit } from '../hooks/useSectionEdit';
 
 /**
@@ -19,7 +20,12 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     editingSections,
     sectionUpdates,
     error,
+    chatOpen,
+    currentChatSection,
     editSection,
+    editSectionWithChat,
+    closeChatInterface,
+    completeChatEdit,
     clearError
   } = useSectionEdit({
     resumeId,
@@ -97,6 +103,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   key={`${section.section_name}-${index}`}
                   section={section}
                   onEdit={() => editSection(section.section_name)}
+                  onChatEdit={() => editSectionWithChat(section.section_name)}
                   isEditing={editingSections.has(section.section_name)}
                 />
               ))}
@@ -149,7 +156,16 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
         </div>
       </div>
 
-
+      {/* Chat Interface Modal */}
+      {chatOpen && currentChatSection && (
+        <ChatInterface
+          isOpen={chatOpen}
+          sectionName={currentChatSection}
+          resumeId={resumeId}
+          onClose={closeChatInterface}
+          onComplete={completeChatEdit}
+        />
+      )}
     </div>
   );
 };

@@ -7,3 +7,10 @@ export type { UploadProgress, UploadResult, UploadOptions } from './uploadServic
 
 export { SectionEditService } from './sectionEditService';
 export type { SectionEditOptions, SectionEditResult } from './sectionEditService';
+
+export { ChatService } from './chatService';
+export type { 
+  ChatInitializeResponse, 
+  ChatSendResponse, 
+  ChatCompleteResponse 
+} from './chatService';
