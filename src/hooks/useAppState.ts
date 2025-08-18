@@ -11,9 +11,24 @@ import { useSessionManager } from '../utils/sessionManager';
 import type { CVAnalysisResult, CVSection } from '../types/cv';
 import type { ResumeRecord } from '../types/database';
 
+// Selector for all state to prevent infinite loops
+const allStateSelector = (state: ReturnType<typeof useCVStore.getState>) => ({
+  sessionId: state.sessionId,
+  currentResume: state.currentResume,
+  analysisResult: state.analysisResult,
+  uploadProgress: state.uploadProgress,
+  isAnalyzing: state.isAnalyzing,
+  editingSection: state.editingSection,
+  chatOpen: state.chatOpen,
+  errors: state.errors,
+  isUploading: state.isUploading,
+  isGeneratingPDF: state.isGeneratingPDF,
+  isEditingSection: state.isEditingSection,
+});
+
 export const useAppState = () => {
   // Store state
-  const state = useCVStore();
+  const state = useCVStore(allStateSelector);
   const actions = useStoreActions();
   
   // Utilities
@@ -217,7 +232,7 @@ export const useAppState = () => {
     chat: chatWorkflow,
     pdf: pdfWorkflow,
     session: sessionWorkflow,
-    errors: errorWorkflow,
+    errorActions: errorWorkflow,
     
     // Utilities
     notifications,

@@ -15,6 +15,13 @@ interface CVCanvasState {
   containerWidth: number;
 }
 
+interface TouchState {
+  initialDistance: number;
+  initialScale: number;
+  lastTouchTime: number;
+  touchCount: number;
+}
+
 const CVCanvas: React.FC<CVCanvasProps> = ({
   pdfUrl,
   updates = [],
@@ -24,6 +31,14 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
   sessionId
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pdfViewerRef = useRef<HTMLDivElement>(null);
+  const touchStateRef = useRef<TouchState>({
+    initialDistance: 0,
+    initialScale: 1,
+    lastTouchTime: 0,
+    touchCount: 0
+  });
+
   const [state, setState] = useState<CVCanvasState>({
     numPages: null,
     currentPage: 1,
@@ -135,6 +150,69 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
     }));
   }, []);
 
+  // Touch gesture handlers
+  const getTouchDistance = useCallback((touches: TouchList) => {
+    if (touches.length < 2) return 0;
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) + 
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touches = e.touches;
+    touchStateRef.current.touchCount = touches.length;
+    touchStateRef.current.lastTouchTime = Date.now();
+
+    if (touches.length === 2) {
+      // Pinch gesture start
+      touchStateRef.current.initialDistance = getTouchDistance(touches);
+      touchStateRef.current.initialScale = state.scale;
+      e.preventDefault();
+    }
+  }, [getTouchDistance, state.scale]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const touches = e.touches;
+
+    if (touches.length === 2 && touchStateRef.current.initialDistance > 0) {
+      // Pinch zoom
+      const currentDistance = getTouchDistance(touches);
+      const scaleChange = currentDistance / touchStateRef.current.initialDistance;
+      const newScale = Math.max(0.25, Math.min(3.0, touchStateRef.current.initialScale * scaleChange));
+      
+      setState(prev => ({
+        ...prev,
+        scale: newScale
+      }));
+      
+      e.preventDefault();
+    }
+  }, [getTouchDistance]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const currentTime = Date.now();
+    const timeDiff = currentTime - touchStateRef.current.lastTouchTime;
+
+    // Handle double tap to zoom
+    if (e.changedTouches.length === 1 && touchStateRef.current.touchCount === 1 && timeDiff < 300) {
+      if (touchStateRef.current.lastTouchTime && (currentTime - touchStateRef.current.lastTouchTime) < 500) {
+        // Double tap detected
+        if (state.scale === 1.0) {
+          setState(prev => ({ ...prev, scale: 2.0 }));
+        } else {
+          setState(prev => ({ ...prev, scale: 1.0 }));
+        }
+      }
+    }
+
+    // Reset touch state
+    touchStateRef.current.initialDistance = 0;
+    touchStateRef.current.touchCount = 0;
+  }, [state.scale]);
+
   const handleRetry = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -189,13 +267,95 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
   return (
     <div className={`flex flex-col h-full bg-white rounded-lg shadow-sm border ${className}`}>
       {/* Header with controls */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-gray-50 space-y-3 sm:space-y-0">
+        
+        {/* Mobile: Top row with page navigation and download */}
+        <div className="flex items-center justify-between sm:hidden">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={goToPreviousPage}
+              disabled={state.currentPage <= 1}
+              className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
+            <span className="text-responsive-xs text-gray-600 min-w-[60px] text-center">
+              {state.numPages ? `${state.currentPage}/${state.numPages}` : 'Loading...'}
+            </span>
+            
+            <button
+              onClick={goToNextPage}
+              disabled={state.currentPage >= (state.numPages || 1)}
+              className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <button
+            onClick={handleDownload}
+            disabled={pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading}
+            className="btn-touch px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
+          >
+            {pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            <span className="text-xs">
+              {pdfGeneration.state.isGenerating ? 'Gen...' : 
+               pdfGeneration.state.isDownloading ? 'Down...' : 
+               'PDF'}
+            </span>
+          </button>
+        </div>
+
+        {/* Mobile: Bottom row with zoom controls */}
+        <div className="flex items-center justify-center space-x-2 sm:hidden">
+          <button
+            onClick={zoomOut}
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
+            aria-label="Zoom out"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </button>
+          
+          <button
+            onClick={resetZoom}
+            className="btn-touch px-3 py-2 text-xs bg-white border rounded-lg hover:bg-gray-50 transition-colors min-w-[50px]"
+          >
+            {Math.round(getResponsiveScale() * 100)}%
+          </button>
+          
+          <button
+            onClick={zoomIn}
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
+            aria-label="Zoom in"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Desktop: Single row layout */}
+        <div className="hidden sm:flex items-center space-x-2">
           {/* Page navigation */}
           <button
             onClick={goToPreviousPage}
             disabled={state.currentPage <= 1}
-            className="p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Previous page"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,7 +370,7 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
           <button
             onClick={goToNextPage}
             disabled={state.currentPage >= (state.numPages || 1)}
-            className="p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Next page"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,11 +379,11 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
           </button>
         </div>
 
-        {/* Zoom controls */}
-        <div className="flex items-center space-x-2">
+        {/* Desktop: Zoom controls */}
+        <div className="hidden sm:flex items-center space-x-2">
           <button
             onClick={zoomOut}
-            className="p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
             aria-label="Zoom out"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,14 +393,14 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
           
           <button
             onClick={resetZoom}
-            className="px-3 py-1 text-sm bg-white border rounded-lg hover:bg-gray-50 transition-colors min-w-[60px]"
+            className="btn-touch px-3 py-1 text-sm bg-white border rounded-lg hover:bg-gray-50 transition-colors min-w-[60px]"
           >
             {Math.round(getResponsiveScale() * 100)}%
           </button>
           
           <button
             onClick={zoomIn}
-            className="p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
+            className="btn-touch p-2 rounded-lg bg-white border hover:bg-gray-50 transition-colors"
             aria-label="Zoom in"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,25 +409,27 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
           </button>
         </div>
 
-        {/* Download button */}
-        <button
-          onClick={handleDownload}
-          disabled={pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
-        >
-          {pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-          ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          )}
-          <span className="hidden sm:inline">
-            {pdfGeneration.state.isGenerating ? 'Generating...' : 
-             pdfGeneration.state.isDownloading ? 'Downloading...' : 
-             'Download PDF'}
-          </span>
-        </button>
+        {/* Desktop: Download button */}
+        <div className="hidden sm:block">
+          <button
+            onClick={handleDownload}
+            disabled={pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading}
+            className="btn-touch px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+          >
+            {pdfGeneration.state.isGenerating || pdfGeneration.state.isDownloading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            <span>
+              {pdfGeneration.state.isGenerating ? 'Generating...' : 
+               pdfGeneration.state.isDownloading ? 'Downloading...' : 
+               'Download PDF'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* PDF Generation Progress */}
@@ -309,15 +471,22 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
       {/* PDF viewer container */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto bg-gray-100 p-4"
+        className="flex-1 overflow-auto bg-gray-100 p-2 sm:p-4"
       >
         <div className="flex justify-center">
-          <div className="relative">
+          <div 
+            ref={pdfViewerRef}
+            className="relative touch-manipulation"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{ touchAction: 'pan-x pan-y pinch-zoom' }}
+          >
             {state.isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10 rounded-lg">
                 <div className="flex flex-col items-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-                  <div className="text-sm text-gray-600">Loading PDF...</div>
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600 mb-2"></div>
+                  <div className="text-responsive-xs text-gray-600">Loading PDF...</div>
                 </div>
               </div>
             )}
@@ -327,18 +496,18 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
-                <div className="flex items-center justify-center p-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex items-center justify-center p-6 sm:p-8">
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
                 </div>
               }
               error={
-                <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <div className="text-red-500 text-lg font-semibold mb-2">
+                <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center">
+                  <div className="text-red-500 text-responsive-base font-semibold mb-2">
                     Failed to load PDF
                   </div>
                   <button
                     onClick={handleRetry}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="btn-touch px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Retry
                   </button>
@@ -350,11 +519,11 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
                 scale={getResponsiveScale()}
                 onLoadError={onPageLoadError}
                 loading={
-                  <div className="flex items-center justify-center p-8 bg-white border rounded-lg">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <div className="flex items-center justify-center p-6 sm:p-8 bg-white border rounded-lg">
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-6 sm:w-6 border-b-2 border-blue-600"></div>
                   </div>
                 }
-                className="shadow-lg"
+                className="shadow-lg rounded-lg"
               />
             </Document>
 
@@ -373,13 +542,20 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
                     }}
                     title={`Updated: ${update.sectionName}`}
                   >
-                    <div className="absolute -top-6 left-0 text-xs bg-blue-600 text-white px-2 py-1 rounded">
+                    <div className="absolute -top-5 sm:-top-6 left-0 text-xs bg-blue-600 text-white px-1 sm:px-2 py-1 rounded text-[10px] sm:text-xs">
                       {update.sectionName}
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* Touch gesture hint for mobile */}
+            <div className="absolute bottom-2 right-2 sm:hidden">
+              <div className="bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                Pinch to zoom • Double tap to reset
+              </div>
+            </div>
           </div>
         </div>
       </div>

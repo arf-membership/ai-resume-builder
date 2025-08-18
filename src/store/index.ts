@@ -4,7 +4,6 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AppState, ErrorState } from '../types/state';
 import type { CVAnalysisResult, CVSection } from '../types/cv';
 import type { ResumeRecord } from '../types/database';
@@ -49,12 +48,12 @@ interface CVStore extends AppState {
 
 // Generate unique session ID
 const generateSessionId = (): string => {
-  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 // Generate unique error ID
 const generateErrorId = (): string => {
-  return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `error_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 // Initial state
@@ -72,10 +71,8 @@ const initialState: AppState = {
   isEditingSection: false,
 };
 
-// Create the store with persistence
-export const useCVStore = create<CVStore>()(
-  persist(
-    (set, get) => ({
+// Create the store without persistence to avoid conflicts with SessionContext
+export const useCVStore = create<CVStore>()((set, get) => ({
       ...initialState,
       
       // Session actions
@@ -261,82 +258,86 @@ export const useCVStore = create<CVStore>()(
           sessionId: generateSessionId(),
         });
       },
-    }),
-    {
-      name: 'cv-store', // Storage key
-      storage: createJSONStorage(() => sessionStorage), // Use sessionStorage for session persistence
-      partialize: (state) => ({
-        // Only persist essential data for session continuity
-        sessionId: state.sessionId,
-        currentResume: state.currentResume,
-        analysisResult: state.analysisResult,
-      }),
-    }
-  )
-);
+    }));
+
+// Memoized selectors to prevent infinite loops
+const sessionIdSelector = (state: CVStore) => state.sessionId;
+const currentResumeSelector = (state: CVStore) => state.currentResume;
+const analysisResultSelector = (state: CVStore) => state.analysisResult;
+const chatOpenSelector = (state: CVStore) => state.chatOpen;
+const errorsSelector = (state: CVStore) => state.errors;
 
 // Selector hooks for specific state slices
-export const useSessionId = () => useCVStore(state => state.sessionId);
-export const useCurrentResume = () => useCVStore(state => state.currentResume);
-export const useAnalysisResult = () => useCVStore(state => state.analysisResult);
-export const useUploadState = () => useCVStore(state => ({
+export const useSessionId = () => useCVStore(sessionIdSelector);
+export const useCurrentResume = () => useCVStore(currentResumeSelector);
+export const useAnalysisResult = () => useCVStore(analysisResultSelector);
+// Memoized selectors to prevent infinite loops
+const uploadStateSelector = (state: CVStore) => ({
   uploadProgress: state.uploadProgress,
   isUploading: state.isUploading,
-}));
-export const useAnalysisState = () => useCVStore(state => ({
+});
+
+const analysisStateSelector = (state: CVStore) => ({
   isAnalyzing: state.isAnalyzing,
   analysisResult: state.analysisResult,
-}));
-export const useEditingState = () => useCVStore(state => ({
+});
+
+const editingStateSelector = (state: CVStore) => ({
   editingSection: state.editingSection,
   isEditingSection: state.isEditingSection,
-}));
-export const useChatState = () => useCVStore(state => state.chatOpen);
-export const usePDFState = () => useCVStore(state => ({
+});
+
+const pdfStateSelector = (state: CVStore) => ({
   isGeneratingPDF: state.isGeneratingPDF,
   generatedPdfPath: state.currentResume?.generated_pdf_path,
-}));
-export const useErrors = () => useCVStore(state => state.errors);
+});
+
+export const useUploadState = () => useCVStore(uploadStateSelector);
+export const useAnalysisState = () => useCVStore(analysisStateSelector);
+export const useEditingState = () => useCVStore(editingStateSelector);
+export const useChatState = () => useCVStore(chatOpenSelector);
+export const usePDFState = () => useCVStore(pdfStateSelector);
+export const useErrors = () => useCVStore(errorsSelector);
+
+// Memoized actions selector to prevent infinite loops
+const actionsSelector = (state: CVStore) => ({
+  // Session actions
+  initializeSession: state.initializeSession,
+  clearSession: state.clearSession,
+  
+  // Upload actions
+  setUploadProgress: state.setUploadProgress,
+  setIsUploading: state.setIsUploading,
+  setCurrentResume: state.setCurrentResume,
+  
+  // Analysis actions
+  setIsAnalyzing: state.setIsAnalyzing,
+  setAnalysisResult: state.setAnalysisResult,
+  updateAnalysisResult: state.updateAnalysisResult,
+  
+  // Section editing actions
+  setEditingSection: state.setEditingSection,
+  setIsEditingSection: state.setIsEditingSection,
+  updateSection: state.updateSection,
+  
+  // Chat actions
+  setChatOpen: state.setChatOpen,
+  
+  // PDF generation actions
+  setIsGeneratingPDF: state.setIsGeneratingPDF,
+  updateGeneratedPdfPath: state.updateGeneratedPdfPath,
+  
+  // Error management actions
+  addError: state.addError,
+  removeError: state.removeError,
+  clearErrors: state.clearErrors,
+  clearErrorsByType: state.clearErrorsByType,
+  
+  // Utility actions
+  reset: state.reset,
+});
 
 // Action hooks for cleaner component usage
-export const useStoreActions = () => {
-  const store = useCVStore();
-  return {
-    // Session actions
-    initializeSession: store.initializeSession,
-    clearSession: store.clearSession,
-    
-    // Upload actions
-    setUploadProgress: store.setUploadProgress,
-    setIsUploading: store.setIsUploading,
-    setCurrentResume: store.setCurrentResume,
-    
-    // Analysis actions
-    setIsAnalyzing: store.setIsAnalyzing,
-    setAnalysisResult: store.setAnalysisResult,
-    updateAnalysisResult: store.updateAnalysisResult,
-    
-    // Section editing actions
-    setEditingSection: store.setEditingSection,
-    setIsEditingSection: store.setIsEditingSection,
-    updateSection: store.updateSection,
-    
-    // Chat actions
-    setChatOpen: store.setChatOpen,
-    
-    // PDF generation actions
-    setIsGeneratingPDF: store.setIsGeneratingPDF,
-    updateGeneratedPdfPath: store.updateGeneratedPdfPath,
-    
-    // Error management actions
-    addError: store.addError,
-    removeError: store.removeError,
-    clearErrors: store.clearErrors,
-    clearErrorsByType: store.clearErrorsByType,
-    
-    // Utility actions
-    reset: store.reset,
-  };
-};
+export const useStoreActions = () => useCVStore(actionsSelector);
 
 export default useCVStore;

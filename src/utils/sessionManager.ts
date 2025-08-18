@@ -210,9 +210,17 @@ class SessionManager {
 // Create singleton instance
 export const sessionManager = new SessionManager();
 
+// Session manager selector to prevent infinite loops
+const sessionManagerSelector = (state: ReturnType<typeof useCVStore.getState>) => ({
+  sessionId: state.sessionId,
+  initializeSession: state.initializeSession,
+  clearSession: state.clearSession,
+  reset: state.reset,
+});
+
 // React hook for session management
 export const useSessionManager = () => {
-  const store = useCVStore();
+  const store = useCVStore(sessionManagerSelector);
   const { showWarning, showInfo } = useNotifications();
 
   return {

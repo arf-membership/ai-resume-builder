@@ -4,7 +4,6 @@
 
 import React from 'react';
 import ErrorBoundary from '../components/ErrorBoundary';
-import NotificationContainer from '../components/NotificationToast';
 import { LoadingOverlay, UploadLoading, AnalysisLoading, EditingLoading, PDFGenerationLoading } from '../components/LoadingIndicator';
 import { useUploadState, useAnalysisState, useEditingState, usePDFState } from '../store';
 
@@ -27,9 +26,6 @@ const ErrorAndLoadingProvider: React.FC<ErrorAndLoadingProviderProps> = ({ child
       {isAnalyzing && <AnalysisLoading />}
       {isEditingSection && <EditingLoading sectionName={editingSection} />}
       {isGeneratingPDF && <PDFGenerationLoading />}
-      
-      {/* Global notification container */}
-      <NotificationContainer />
     </ErrorBoundary>
   );
 };

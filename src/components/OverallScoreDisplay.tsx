@@ -35,35 +35,35 @@ export const OverallScoreDisplay: React.FC<OverallScoreDisplayProps> = ({
   const scoreMessage = getScoreMessage(score);
 
   return (
-    <div className={`bg-gradient-to-r ${gradientClass} rounded-xl border-2 p-8 text-center ${className}`}>
+    <div className={`bg-gradient-to-r ${gradientClass} rounded-xl border-2 p-4 lg:p-8 text-center ${className}`}>
       {/* Main score display */}
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Overall CV Score</h2>
+      <div className="mb-3 sm:mb-4">
+        <h2 className="text-responsive-xl lg:text-2xl font-bold text-gray-900 mb-2">Overall CV Score</h2>
         <div className="flex justify-center">
-          <ScoreDisplay score={score} size="large" className="text-2xl px-6 py-4" />
+          <ScoreDisplay score={score} size="large" className="text-xl px-4 py-3" />
         </div>
       </div>
 
       {/* Score message */}
-      <div className="mb-4">
-        <p className="text-lg font-medium text-gray-800">
+      <div className="mb-3 sm:mb-4">
+        <p className="text-responsive-base font-medium text-gray-800">
           {scoreMessage}
         </p>
       </div>
 
       {/* Summary */}
       <div className="max-w-2xl mx-auto">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Summary</h3>
-        <p className="text-gray-600 leading-relaxed">
+        <h3 className="text-responsive-sm font-medium text-gray-700 mb-2">Summary</h3>
+        <p className="text-responsive-xs text-gray-600 leading-relaxed">
           {summary}
         </p>
       </div>
 
       {/* Progress bar visualization */}
-      <div className="mt-6">
-        <div className="w-full bg-gray-200 rounded-full h-3">
+      <div className="mt-4 sm:mt-6">
+        <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
           <div
-            className={`h-3 rounded-full transition-all duration-1000 ease-out ${
+            className={`h-2 sm:h-3 rounded-full transition-all duration-1000 ease-out ${
               score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
             }`}
             style={{ width: `${Math.min(score, 100)}%` }}

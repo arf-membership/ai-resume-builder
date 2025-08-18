@@ -23,7 +23,7 @@ interface NotificationStore {
 
 // Generate unique notification ID
 const generateNotificationId = (): string => {
-  return `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `notification_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 };
 
 export const useNotificationStore = create<NotificationStore>((set, get) => ({
@@ -66,9 +66,17 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   },
 }));
 
+// Memoized selector to prevent infinite loops
+const notificationStoreSelector = (state: NotificationStore) => ({
+  notifications: state.notifications,
+  addNotification: state.addNotification,
+  removeNotification: state.removeNotification,
+  clearNotifications: state.clearNotifications,
+});
+
 // Convenience hooks for different notification types
 export const useNotifications = () => {
-  const { notifications, addNotification, removeNotification, clearNotifications } = useNotificationStore();
+  const { notifications, addNotification, removeNotification, clearNotifications } = useNotificationStore(notificationStoreSelector);
   
   return {
     notifications,

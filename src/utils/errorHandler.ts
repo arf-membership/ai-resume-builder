@@ -250,9 +250,15 @@ class ErrorHandler {
 export const errorHandler = new ErrorHandler();
 
 // React hook for error handling
+// Error handler selector to prevent infinite loops
+const errorHandlerSelector = (state: ReturnType<typeof useCVStore.getState>) => ({
+  errors: state.errors,
+  clearErrors: state.clearErrors,
+  clearErrorsByType: state.clearErrorsByType,
+});
+
 export const useErrorHandler = () => {
-  const errors = useCVStore(state => state.errors);
-  const { clearErrors, clearErrorsByType } = useCVStore();
+  const { errors, clearErrors, clearErrorsByType } = useCVStore(errorHandlerSelector);
 
   return {
     errors,

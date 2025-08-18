@@ -26,120 +26,70 @@ interface SessionProviderProps {
  * Manages session state and provides session utilities to child components
  */
 export function SessionProvider({ children }: SessionProviderProps) {
-  const [sessionData, setSessionData] = useState<SessionData | null>(null);
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  // Simplified session provider - no complex state management
+  const [sessionData, setSessionData] = useState<SessionData | null>({
+    sessionId: `simple-session-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+  });
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
 
   /**
-   * Initialize or refresh the session
+   * Simplified refresh session - no complex logic
    */
   const refreshSession = useCallback(() => {
-    try {
-      setIsSessionLoading(true);
-      
-      if (!SessionStorageService.isStorageAvailable()) {
-        console.warn('localStorage is not available, session will not persist');
-        setSessionData(null);
-        setIsSessionLoading(false);
-        return;
-      }
-
-      const session = SessionStorageService.getOrCreateSession();
-      setSessionData(session);
-    } catch (error) {
-      console.error('Error refreshing session:', error);
-      setSessionData(null);
-    } finally {
-      setIsSessionLoading(false);
-    }
+    console.log('Session refreshed (simplified)');
   }, []);
 
   /**
-   * Clear the current session
+   * Simplified clear session
    */
   const clearSession = useCallback(() => {
-    try {
-      SessionStorageService.clearSession();
-      setSessionData(null);
-    } catch (error) {
-      console.error('Error clearing session:', error);
-    }
+    setSessionData(null);
   }, []);
 
   /**
-   * Update session activity timestamp
+   * Simplified update activity
    */
   const updateActivity = useCallback(() => {
-    try {
-      SessionStorageService.updateLastActivity();
-      // Update the local state to reflect the new activity time
-      if (sessionData) {
-        setSessionData(prev => prev ? {
-          ...prev,
-          lastActivity: new Date().toISOString()
-        } : null);
-      }
-    } catch (error) {
-      console.error('Error updating session activity:', error);
-    }
-  }, [sessionData]);
+    console.log('Activity updated (simplified)');
+  }, []);
 
   /**
-   * Initialize session on component mount
+   * Set up simplified activity tracking - commented out to prevent infinite loops
    */
-  useEffect(() => {
-    refreshSession();
-  }, [refreshSession]);
+  // useEffect(() => {
+  //   if (!sessionData) return;
+  //   
+  //   // Simplified activity tracking - only on click events
+  //   const handleUserActivity = () => {
+  //     updateActivity();
+  //   };
+  //   
+  //   document.addEventListener('click', handleUserActivity, { passive: true });
+  //   
+  //   return () => {
+  //     document.removeEventListener('click', handleUserActivity);
+  //   };
+  // }, [sessionData]);
 
   /**
-   * Set up activity tracking
+   * Periodic session validation - temporarily disabled to prevent infinite loops
    */
-  useEffect(() => {
-    if (!sessionData) return;
-
-    // Update activity on user interactions
-    const handleUserActivity = () => {
-      updateActivity();
-    };
-
-    // Track various user interaction events
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
-    // Throttle activity updates to avoid excessive localStorage writes
-    let activityTimeout: NodeJS.Timeout;
-    const throttledActivityUpdate = () => {
-      clearTimeout(activityTimeout);
-      activityTimeout = setTimeout(handleUserActivity, 30000); // Update every 30 seconds max
-    };
-
-    events.forEach(event => {
-      document.addEventListener(event, throttledActivityUpdate, { passive: true });
-    });
-
-    return () => {
-      clearTimeout(activityTimeout);
-      events.forEach(event => {
-        document.removeEventListener(event, throttledActivityUpdate);
-      });
-    };
-  }, [sessionData, updateActivity]);
-
-  /**
-   * Periodic session validation
-   */
-  useEffect(() => {
-    if (!sessionData) return;
-
-    // Check session validity every 5 minutes
-    const validationInterval = setInterval(() => {
-      const currentSession = SessionStorageService.getCurrentSession();
-      if (!currentSession) {
-        // Session has expired or been cleared
-        setSessionData(null);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(validationInterval);
-  }, [sessionData]);
+  // useEffect(() => {
+  //   if (!sessionData) return;
+  //
+  //   // Check session validity every 5 minutes
+  //   const validationInterval = setInterval(() => {
+  //     const currentSession = SessionStorageService.getCurrentSession();
+  //     if (!currentSession) {
+  //       // Session has expired or been cleared
+  //       setSessionData(null);
+  //     }
+  //   }, 5 * 60 * 1000); // 5 minutes
+  //
+  //   return () => clearInterval(validationInterval);
+  // }, [sessionData]);
 
   const contextValue: SessionContextType = {
     sessionData,

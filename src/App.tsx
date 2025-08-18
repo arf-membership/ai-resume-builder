@@ -1,15 +1,16 @@
 import './App.css'
+import AppProvider from './providers/AppProvider'
 import { SessionProvider } from './contexts/SessionContext'
 import { LandingPage } from './components/LandingPage'
-import ErrorAndLoadingProvider from './providers/ErrorAndLoadingProvider'
 
+// Step 2: Add back SessionProvider with simplified implementation
 function App() {
   return (
-    <ErrorAndLoadingProvider>
+    <AppProvider>
       <SessionProvider>
         <LandingPage />
       </SessionProvider>
-    </ErrorAndLoadingProvider>
+    </AppProvider>
   )
 }
 

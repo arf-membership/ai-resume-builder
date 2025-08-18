@@ -2,7 +2,7 @@
  * React Error Boundary component for catching and handling React errors
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useNotifications } from '../store/notificationStore';
 import { useCVStore } from '../store';
 
@@ -38,7 +38,7 @@ class ErrorBoundary extends Component<Props, State> {
     store.addError({
       type: 'validation',
       message: `React Error: ${error.message}`,
-      details: errorInfo.componentStack,
+      details: errorInfo.componentStack || undefined,
     });
 
     // Call custom error handler if provided
@@ -65,9 +65,8 @@ class ErrorBoundary extends Component<Props, State> {
         timestamp: new Date().toISOString(),
       });
       
-      // Show success notification
-      const notifications = useNotifications.getState();
-      notifications.showSuccess('Error Reported', 'Thank you for reporting this issue. We will investigate it.');
+      // Note: Can't show notifications here since this is a class component method
+      // Notifications should be handled by the error display UI instead
     }
   };
 
@@ -80,7 +79,7 @@ class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 lg:px-8">
           <div className="max-w-md w-full space-y-8">
             <div className="text-center">
               <div className="mx-auto h-12 w-12 text-red-500">

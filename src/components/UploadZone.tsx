@@ -196,7 +196,7 @@ export function UploadZone({
       {/* Upload Zone */}
       <div
         className={`
-          relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 cursor-pointer
+          relative border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 cursor-pointer touch-manipulation
           ${isActive 
             ? 'border-blue-400 bg-blue-50' 
             : isDisabled 
@@ -209,6 +209,15 @@ export function UploadZone({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={handleClick}
+        role="button"
+        tabIndex={isDisabled ? -1 : 0}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && !isDisabled) {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+        aria-label="Upload PDF file"
       >
         {/* Hidden file input */}
         <input
@@ -218,20 +227,22 @@ export function UploadZone({
           onChange={handleFileInputChange}
           className="hidden"
           disabled={isDisabled}
+          aria-hidden="true"
         />
 
         {/* Upload Icon */}
-        <div className="mb-4">
+        <div className="mb-3 sm:mb-4">
           {isUploading ? (
-            <div className="w-16 h-16 mx-auto">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto">
+              <div className="animate-spin rounded-full h-full w-full border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <svg 
-              className={`w-16 h-16 mx-auto ${isDisabled ? 'text-gray-300' : 'text-gray-400'}`} 
+              className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto ${isDisabled ? 'text-gray-300' : 'text-gray-400'}`} 
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path 
                 strokeLinecap="round" 
@@ -244,19 +255,25 @@ export function UploadZone({
         </div>
 
         {/* Upload Text */}
-        <div className="space-y-2">
+        <div className="space-y-1 sm:space-y-2">
           {isUploading ? (
             <>
-              <p className="text-lg font-medium text-gray-700">Uploading your CV...</p>
-              <p className="text-sm text-gray-500">Please wait while we process your file</p>
+              <p className="text-responsive-base font-medium text-gray-700">Uploading your CV...</p>
+              <p className="text-responsive-sm text-gray-500">Please wait while we process your file</p>
             </>
           ) : (
             <>
-              <p className={`text-lg font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>
-                {isActive ? 'Drop your PDF here' : 'Drag and drop your PDF CV here'}
+              <p className={`text-responsive-base font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>
+                {isActive ? 'Drop your PDF here' : (
+                  <>
+                    <span className="hidden sm:inline">Drag and drop your PDF CV here</span>
+                    <span className="sm:hidden">Tap to select your PDF CV</span>
+                  </>
+                )}
               </p>
-              <p className={`text-sm ${isDisabled ? 'text-gray-300' : 'text-gray-500'}`}>
-                or click to browse files
+              <p className={`text-responsive-sm ${isDisabled ? 'text-gray-300' : 'text-gray-500'}`}>
+                <span className="hidden sm:inline">or click to browse files</span>
+                <span className="sm:hidden">Browse files from your device</span>
               </p>
             </>
           )}
@@ -264,10 +281,13 @@ export function UploadZone({
 
         {/* File Requirements */}
         {!isUploading && (
-          <div className="mt-4 text-xs text-gray-400 space-y-1">
-            <p>• PDF files only</p>
-            <p>• Maximum file size: 10MB</p>
-            <p>• Secure and private processing</p>
+          <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400 space-y-1">
+            <div className="flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-1 sm:space-y-0">
+              <span>• PDF files only</span>
+              <span>• Max 10MB</span>
+              <span className="hidden sm:inline">• Secure processing</span>
+            </div>
+            <p className="sm:hidden">• Secure and private processing</p>
           </div>
         )}
       </div>
@@ -285,7 +305,7 @@ export function UploadZone({
           <div className="flex justify-center">
             <button
               onClick={cancelUpload}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="btn-touch px-4 py-2 text-responsive-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               Cancel Upload
             </button>

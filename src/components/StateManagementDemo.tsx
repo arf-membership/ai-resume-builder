@@ -4,7 +4,6 @@
 
 import React from 'react';
 import { useAppState } from '../hooks/useAppState';
-import { NotificationContainer } from './NotificationToast';
 
 const StateManagementDemo: React.FC = () => {
   const {
@@ -254,8 +253,6 @@ const StateManagementDemo: React.FC = () => {
           </div>
         )}
       </div>
-
-      <NotificationContainer />
     </div>
   );
 };
