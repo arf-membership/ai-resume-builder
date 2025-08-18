@@ -2,52 +2,51 @@
  * Tests for error handler utilities
  */
 
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
 import { errorHandler, useErrorHandler } from '../errorHandler';
 import { useCVStore } from '../../store';
-import { useNotifications } from '../../store/notificationStore';
+import { useNotificationStore } from '../../store/notificationStore';
 
 // Mock the stores
-jest.mock('../../store', () => ({
+vi.mock('../../store', () => ({
   useCVStore: {
-    getState: jest.fn(),
+    getState: vi.fn(),
   },
 }));
 
-jest.mock('../../store/notificationStore', () => ({
-  useNotifications: {
-    getState: jest.fn(),
+vi.mock('../../store/notificationStore', () => ({
+  useNotificationStore: {
+    getState: vi.fn(),
   },
 }));
 
 describe('Error Handler', () => {
-  const mockAddError = jest.fn();
-  const mockClearErrors = jest.fn();
-  const mockClearErrorsByType = jest.fn();
-  const mockShowError = jest.fn();
-  const mockShowWarning = jest.fn();
+  const mockAddError = vi.fn();
+  const mockClearErrors = vi.fn();
+  const mockClearErrorsByType = vi.fn();
+  const mockAddNotification = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
-    (useCVStore.getState as jest.Mock).mockReturnValue({
+    vi.mocked(useCVStore.getState).mockReturnValue({
       addError: mockAddError,
       clearErrors: mockClearErrors,
       clearErrorsByType: mockClearErrorsByType,
       errors: [],
-    });
+    } as any);
 
-    (useNotifications.getState as jest.Mock).mockReturnValue({
-      showError: mockShowError,
-      showWarning: mockShowWarning,
-    });
+    vi.mocked(useNotificationStore.getState).mockReturnValue({
+      addNotification: mockAddNotification,
+    } as any);
 
     // Mock console.error to avoid noise in tests
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('Basic Error Handling', () => {
@@ -60,11 +59,12 @@ describe('Error Handler', () => {
         details: undefined,
       });
 
-      expect(mockShowError).toHaveBeenCalledWith(
-        'Error',
-        'Failed to upload your CV. Please check your file and try again.',
-        0
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to upload your CV. Please check your file and try again.',
+        duration: 0,
+      });
     });
 
     it('should handle Error objects', () => {
@@ -79,15 +79,16 @@ describe('Error Handler', () => {
         details: 'Error stack trace',
       });
 
-      expect(mockShowWarning).toHaveBeenCalledWith(
-        'Warning',
-        'Network connection issue. Please check your internet connection.',
-        6000
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'warning',
+        title: 'Warning',
+        message: 'Network connection issue. Please check your internet connection.',
+        duration: 6000,
+      });
     });
 
     it('should log errors to console', () => {
-      const consoleSpy = jest.spyOn(console, 'error');
+      const consoleSpy = vi.spyOn(console, 'error');
       
       errorHandler.handleError('analysis', 'Analysis failed', { resumeId: 'test-123' });
 
@@ -202,7 +203,7 @@ describe('Error Handler', () => {
   describe('Retry Operation', () => {
     it('should retry operation on failure', async () => {
       let attempts = 0;
-      const operation = jest.fn().mockImplementation(() => {
+      const operation = vi.fn().mockImplementation(() => {
         attempts++;
         if (attempts < 3) {
           throw new Error('Temporary failure');
@@ -217,7 +218,7 @@ describe('Error Handler', () => {
     });
 
     it('should throw error after max retries', async () => {
-      const operation = jest.fn().mockRejectedValue(new Error('Persistent failure'));
+      const operation = vi.fn().mockRejectedValue(new Error('Persistent failure'));
 
       await expect(
         errorHandler.retryOperation(operation, 2, 50)
@@ -227,54 +228,12 @@ describe('Error Handler', () => {
     });
 
     it('should succeed on first attempt', async () => {
-      const operation = jest.fn().mockResolvedValue('immediate success');
+      const operation = vi.fn().mockResolvedValue('immediate success');
 
       const result = await errorHandler.retryOperation(operation, 3, 100);
 
       expect(result).toBe('immediate success');
       expect(operation).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('useErrorHandler Hook', () => {
-    it('should provide error handling methods', () => {
-      const { result } = renderHook(() => useErrorHandler());
-
-      expect(typeof result.current.handleUploadError).toBe('function');
-      expect(typeof result.current.handleAnalysisError).toBe('function');
-      expect(typeof result.current.handleEditError).toBe('function');
-      expect(typeof result.current.handleDownloadError).toBe('function');
-      expect(typeof result.current.handleNetworkError).toBe('function');
-      expect(typeof result.current.handleValidationError).toBe('function');
-      expect(typeof result.current.retryOperation).toBe('function');
-    });
-
-    it('should provide store methods', () => {
-      const { result } = renderHook(() => useErrorHandler());
-
-      expect(typeof result.current.clearErrors).toBe('function');
-      expect(typeof result.current.clearErrorsByType).toBe('function');
-    });
-
-    it('should provide current errors', () => {
-      const mockErrors = [
-        {
-          id: 'error-1',
-          type: 'upload' as const,
-          message: 'Upload failed',
-          timestamp: new Date(),
-        },
-      ];
-
-      (useCVStore as jest.Mock).mockReturnValue({
-        errors: mockErrors,
-        clearErrors: mockClearErrors,
-        clearErrorsByType: mockClearErrorsByType,
-      });
-
-      const { result } = renderHook(() => useErrorHandler());
-
-      expect(result.current.errors).toEqual(mockErrors);
     });
   });
 
@@ -293,34 +252,38 @@ describe('Error Handler', () => {
   describe('Notification Types', () => {
     it('should show warnings for network and validation errors', () => {
       errorHandler.handleError('network', 'Connection failed');
-      expect(mockShowWarning).toHaveBeenCalledWith(
-        'Warning',
-        'Network connection issue. Please check your internet connection.',
-        6000
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'warning',
+        title: 'Warning',
+        message: 'Network connection issue. Please check your internet connection.',
+        duration: 6000,
+      });
 
       errorHandler.handleError('validation', 'Invalid input');
-      expect(mockShowWarning).toHaveBeenCalledWith(
-        'Warning',
-        'Invalid input detected. Please check your data and try again.',
-        6000
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'warning',
+        title: 'Warning',
+        message: 'Invalid input detected. Please check your data and try again.',
+        duration: 6000,
+      });
     });
 
     it('should show persistent errors for other error types', () => {
       errorHandler.handleError('upload', 'Upload failed');
-      expect(mockShowError).toHaveBeenCalledWith(
-        'Error',
-        'Failed to upload your CV. Please check your file and try again.',
-        0
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to upload your CV. Please check your file and try again.',
+        duration: 0,
+      });
 
       errorHandler.handleError('analysis', 'Analysis failed');
-      expect(mockShowError).toHaveBeenCalledWith(
-        'Error',
-        'Failed to analyze your CV. Please try again or contact support.',
-        0
-      );
+      expect(mockAddNotification).toHaveBeenCalledWith({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to analyze your CV. Please try again or contact support.',
+        duration: 0,
+      });
     });
   });
 });

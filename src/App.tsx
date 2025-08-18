@@ -1,12 +1,15 @@
 import './App.css'
 import { SessionProvider } from './contexts/SessionContext'
 import { LandingPage } from './components/LandingPage'
+import ErrorAndLoadingProvider from './providers/ErrorAndLoadingProvider'
 
 function App() {
   return (
-    <SessionProvider>
-      <LandingPage />
-    </SessionProvider>
+    <ErrorAndLoadingProvider>
+      <SessionProvider>
+        <LandingPage />
+      </SessionProvider>
+    </ErrorAndLoadingProvider>
   )
 }
 

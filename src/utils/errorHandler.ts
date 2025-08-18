@@ -4,7 +4,7 @@
  */
 
 import { useCVStore } from '../store';
-import { useNotifications } from '../store/notificationStore';
+import { useNotificationStore } from '../store/notificationStore';
 import type { ErrorState } from '../types/state';
 
 export interface ErrorHandlerConfig {
@@ -32,7 +32,7 @@ class ErrorHandler {
   handleError(
     type: ErrorState['type'],
     error: Error | string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): void {
     const errorMessage = typeof error === 'string' ? error : error.message;
     const errorDetails = typeof error === 'object' ? error.stack : undefined;
@@ -69,7 +69,7 @@ class ErrorHandler {
    * Show appropriate notification based on error type
    */
   private showErrorNotification(type: ErrorState['type'], message: string): void {
-    const { showError, showWarning } = useNotifications.getState();
+    const notificationStore = useNotificationStore.getState();
 
     const userFriendlyMessages = {
       upload: 'Failed to upload your CV. Please check your file and try again.',
@@ -83,9 +83,19 @@ class ErrorHandler {
     const userMessage = userFriendlyMessages[type] || message;
 
     if (type === 'network' || type === 'validation') {
-      showWarning('Warning', userMessage, 6000);
+      notificationStore.addNotification({ 
+        type: 'warning', 
+        title: 'Warning', 
+        message: userMessage, 
+        duration: 6000 
+      });
     } else {
-      showError('Error', userMessage, 0); // Persistent for errors
+      notificationStore.addNotification({ 
+        type: 'error', 
+        title: 'Error', 
+        message: userMessage, 
+        duration: 0 
+      }); // Persistent for errors
     }
   }
 
@@ -95,7 +105,7 @@ class ErrorHandler {
   private logToExternalService(
     type: ErrorState['type'],
     error: Error | string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): void {
     // This would integrate with services like Sentry, LogRocket, etc.
     console.log('Would log to external service:', { type, error, context });
