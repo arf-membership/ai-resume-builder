@@ -14,3 +14,18 @@ export type {
   ChatSendResponse, 
   ChatCompleteResponse 
 } from './chatService';
+
+export { PDFGenerationService } from './pdfGenerationService';
+
+export { CacheService } from './cacheService';
+
+export { PDFOptimizationService, pdfOptimizationService } from './pdfOptimizationService';
+
+export { 
+  PerformanceMonitoringService, 
+  performanceMonitoring, 
+  trackOperation, 
+  trackSyncOperation, 
+  trackError, 
+  trackUserInteraction 
+} from './performanceMonitoringService';

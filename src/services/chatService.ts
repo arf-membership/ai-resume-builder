@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { CacheService } from './cacheService';
+import { trackOperation } from './performanceMonitoringService';
 import type { ChatMessage } from '../types/api';
 
 export interface ChatInitializeResponse {
@@ -79,46 +81,65 @@ export class ChatService {
     messages: ChatMessage[],
     sessionId: string
   ): Promise<ChatSendResponse> {
-    try {
-      this.validateChatRequest(resumeId, sectionName, sessionId);
+    return trackOperation(
+      'chat_send_message',
+      async () => {
+        try {
+          this.validateChatRequest(resumeId, sectionName, sessionId);
 
-      if (!messages || messages.length === 0) {
-        throw new Error('Messages are required');
-      }
+          if (!messages || messages.length === 0) {
+            throw new Error('Messages are required');
+          }
 
-      const { data, error } = await supabase.functions.invoke('chat-section', {
-        body: {
-          action: 'send',
-          resumeId,
-          sectionName,
-          messages
-        },
-        headers: {
-          'x-session-id': sessionId,
-          'Content-Type': 'application/json'
+          // Cache conversation
+          CacheService.cacheChatConversation(resumeId, sectionName, messages);
+
+          const { data, error } = await supabase.functions.invoke('chat-section', {
+            body: {
+              action: 'send',
+              resumeId,
+              sectionName,
+              messages
+            },
+            headers: {
+              'x-session-id': sessionId,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (error) {
+            throw new Error(`Message sending failed: ${error.message}`);
+          }
+
+          if (!data || !data.success) {
+            throw new Error(data?.error || 'Message sending failed');
+          }
+
+          const response = {
+            message: data.data.message,
+            requiresMoreInfo: data.data.requiresMoreInfo,
+            suggestedQuestions: data.data.suggestedQuestions
+          };
+
+          // Update cached conversation with response
+          const updatedMessages = [...messages, response.message];
+          CacheService.cacheChatConversation(resumeId, sectionName, updatedMessages);
+
+          return response;
+
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error('An unexpected error occurred while sending message');
         }
-      });
-
-      if (error) {
-        throw new Error(`Message sending failed: ${error.message}`);
+      },
+      {
+        resumeId,
+        sectionName,
+        messageCount: messages.length,
       }
-
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Message sending failed');
-      }
-
-      return {
-        message: data.data.message,
-        requiresMoreInfo: data.data.requiresMoreInfo,
-        suggestedQuestions: data.data.suggestedQuestions
-      };
-
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('An unexpected error occurred while sending message');
-    }
+    );
   }
 
   /**

@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { CacheService } from './cacheService';
+import { trackOperation } from './performanceMonitoringService';
 import type { SectionEditRequest, SectionEditResponse } from '../types/api';
 import type { CVSection } from '../types/cv';
 
@@ -36,71 +38,106 @@ export class SectionEditService {
   ): Promise<SectionEditResult> {
     const { signal, onProgress } = options;
 
-    try {
-      onProgress?.('Preparing section for editing...');
+    return trackOperation(
+      'section_edit',
+      async () => {
+        try {
+          onProgress?.('Preparing section for editing...');
 
-      // Validate inputs
-      this.validateEditRequest(resumeId, sectionName, currentContent, suggestions, sessionId);
+          // Validate inputs
+          this.validateEditRequest(resumeId, sectionName, currentContent, suggestions, sessionId);
 
-      // Check if request was aborted
-      if (signal?.aborted) {
-        throw new Error('Section editing was cancelled');
-      }
+          // Check if request was aborted
+          if (signal?.aborted) {
+            throw new Error('Section editing was cancelled');
+          }
 
-      onProgress?.('Sending to AI for improvement...');
+          // Check cache first
+          const cachedResult = CacheService.getCachedSectionEditResult(
+            resumeId,
+            sectionName,
+            currentContent,
+            suggestions
+          );
 
-      // Prepare request data
-      const requestData: SectionEditRequest = {
+          if (cachedResult) {
+            onProgress?.('Using cached result...');
+            return cachedResult;
+          }
+
+          onProgress?.('Sending to AI for improvement...');
+
+          // Prepare request data
+          const requestData: SectionEditRequest = {
+            resumeId,
+            sectionName,
+            currentContent,
+            suggestions,
+            ...(additionalContext && { additionalContext })
+          };
+
+          // Make request to Edge Function
+          const { data, error } = await supabase.functions.invoke('edit-section', {
+            body: requestData,
+            headers: {
+              'x-session-id': sessionId,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          // Check if request was aborted
+          if (signal?.aborted) {
+            throw new Error('Section editing was cancelled');
+          }
+
+          // Handle response
+          if (error) {
+            throw new Error(`Section editing failed: ${error.message}`);
+          }
+
+          if (!data || !data.success) {
+            throw new Error(data?.error || 'Section editing failed');
+          }
+
+          onProgress?.('Section updated successfully');
+
+          const responseData = data.data as SectionEditResponse;
+          
+          const result: SectionEditResult = {
+            updatedSection: responseData.updatedSection,
+            updatedScore: responseData.updatedScore,
+            message: responseData.message
+          };
+
+          // Cache the result
+          CacheService.cacheSectionEditResult(
+            resumeId,
+            sectionName,
+            currentContent,
+            suggestions,
+            result
+          );
+
+          return result;
+
+        } catch (error) {
+          // Handle different types of errors
+          if (error instanceof Error) {
+            if (error.name === 'AbortError' || error.message.includes('cancelled')) {
+              throw new Error('Section editing was cancelled by user');
+            }
+            throw error;
+          }
+          throw new Error('An unexpected error occurred during section editing');
+        }
+      },
+      {
         resumeId,
         sectionName,
-        currentContent,
-        suggestions,
-        ...(additionalContext && { additionalContext })
-      };
-
-      // Make request to Edge Function
-      const { data, error } = await supabase.functions.invoke('edit-section', {
-        body: requestData,
-        headers: {
-          'x-session-id': sessionId,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // Check if request was aborted
-      if (signal?.aborted) {
-        throw new Error('Section editing was cancelled');
+        contentLength: currentContent.length,
+        suggestionsLength: suggestions.length,
       }
-
-      // Handle response
-      if (error) {
-        throw new Error(`Section editing failed: ${error.message}`);
-      }
-
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Section editing failed');
-      }
-
-      onProgress?.('Section updated successfully');
-
-      const responseData = data.data as SectionEditResponse;
-      
-      return {
-        updatedSection: responseData.updatedSection,
-        updatedScore: responseData.updatedScore,
-        message: responseData.message
-      };
-
-    } catch (error) {
-      // Handle different types of errors
-      if (error instanceof Error) {
-        if (error.name === 'AbortError' || error.message.includes('cancelled')) {
-          throw new Error('Section editing was cancelled by user');
-        }
-        throw error;
-      }
-      throw new Error('An unexpected error occurred during section editing');
-    }
+    );
   }
 
   /**

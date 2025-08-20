@@ -2,6 +2,8 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import type { CVCanvasProps } from '../types/components';
 import { usePDFGeneration } from '../hooks/usePDFGeneration';
+import { pdfOptimizationService } from '../services/pdfOptimizationService';
+import { trackOperation, trackUserInteraction } from '../services/performanceMonitoringService';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -91,14 +93,36 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
     return calculatedScale * state.scale;
   }, [state.containerWidth, state.scale]);
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+  const onDocumentLoadSuccess = useCallback(async ({ numPages }: { numPages: number }) => {
     setState(prev => ({
       ...prev,
       numPages,
       isLoading: false,
       error: null
     }));
-  }, []);
+
+    // Initialize PDF optimization service
+    try {
+      const pdfDocument = await pdfjs.getDocument(pdfUrl).promise;
+      await pdfOptimizationService.initialize(pdfDocument);
+      
+      // Update container dimensions for virtual scrolling
+      if (containerRef.current) {
+        const { offsetWidth, offsetHeight } = containerRef.current;
+        pdfOptimizationService.updateContainerDimensions(offsetWidth, offsetHeight);
+      }
+
+      // Preload pages around current page
+      await pdfOptimizationService.preloadPages(state.currentPage);
+      
+      trackOperation('pdf_document_loaded', async () => Promise.resolve(), {
+        numPages,
+        pdfUrl: pdfUrl.substring(0, 50) + '...',
+      });
+    } catch (error) {
+      console.warn('Failed to initialize PDF optimization:', error);
+    }
+  }, [pdfUrl, state.currentPage]);
 
   const onDocumentLoadError = useCallback((error: Error) => {
     setState(prev => ({
@@ -116,38 +140,101 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
   }, []);
 
   const goToPreviousPage = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      currentPage: Math.max(1, prev.currentPage - 1)
-    }));
+    setState(prev => {
+      const newPage = Math.max(1, prev.currentPage - 1);
+      
+      // Track user interaction
+      trackUserInteraction('pdf_navigation', 'previous_page', '/cv-canvas', {
+        fromPage: prev.currentPage,
+        toPage: newPage,
+      });
+
+      // Preload pages around new current page
+      pdfOptimizationService.preloadPages(newPage);
+
+      return {
+        ...prev,
+        currentPage: newPage
+      };
+    });
   }, []);
 
   const goToNextPage = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      currentPage: Math.min(prev.numPages || 1, prev.currentPage + 1)
-    }));
+    setState(prev => {
+      const newPage = Math.min(prev.numPages || 1, prev.currentPage + 1);
+      
+      // Track user interaction
+      trackUserInteraction('pdf_navigation', 'next_page', '/cv-canvas', {
+        fromPage: prev.currentPage,
+        toPage: newPage,
+      });
+
+      // Preload pages around new current page
+      pdfOptimizationService.preloadPages(newPage);
+
+      return {
+        ...prev,
+        currentPage: newPage
+      };
+    });
   }, []);
 
   const zoomIn = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      scale: Math.min(3.0, prev.scale + 0.25)
-    }));
+    setState(prev => {
+      const newScale = Math.min(3.0, prev.scale + 0.25);
+      
+      // Update PDF optimization service scale
+      pdfOptimizationService.setScale(newScale);
+      
+      // Track user interaction
+      trackUserInteraction('pdf_zoom', 'zoom_in', '/cv-canvas', {
+        fromScale: prev.scale,
+        toScale: newScale,
+      });
+
+      return {
+        ...prev,
+        scale: newScale
+      };
+    });
   }, []);
 
   const zoomOut = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      scale: Math.max(0.25, prev.scale - 0.25)
-    }));
+    setState(prev => {
+      const newScale = Math.max(0.25, prev.scale - 0.25);
+      
+      // Update PDF optimization service scale
+      pdfOptimizationService.setScale(newScale);
+      
+      // Track user interaction
+      trackUserInteraction('pdf_zoom', 'zoom_out', '/cv-canvas', {
+        fromScale: prev.scale,
+        toScale: newScale,
+      });
+
+      return {
+        ...prev,
+        scale: newScale
+      };
+    });
   }, []);
 
   const resetZoom = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      scale: 1.0
-    }));
+    setState(prev => {
+      // Update PDF optimization service scale
+      pdfOptimizationService.setScale(1.0);
+      
+      // Track user interaction
+      trackUserInteraction('pdf_zoom', 'reset_zoom', '/cv-canvas', {
+        fromScale: prev.scale,
+        toScale: 1.0,
+      });
+
+      return {
+        ...prev,
+        scale: 1.0
+      };
+    });
   }, []);
 
   // Touch gesture handlers
