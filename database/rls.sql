@@ -4,6 +4,7 @@
 -- Enable Row Level Security on tables
 ALTER TABLE resumes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_provider_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- Resumes table policies
 -- Since we don't have user authentication, we'll use session-based access control
@@ -46,6 +47,15 @@ CREATE POLICY "Users can delete their own resumes" ON resumes
 CREATE POLICY "Allow reading active AI provider settings" ON ai_provider_settings
     FOR SELECT
     USING (is_active = true);
+
+-- Rate Limits table policies
+-- These should only be accessible by service role for rate limiting functionality
+
+-- Policy: Allow service role to manage rate limits
+CREATE POLICY "Service role can manage rate limits" ON rate_limits
+    FOR ALL
+    USING (auth.jwt() ->> 'role' = 'service_role')
+    WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 
 -- Storage policies for buckets
 

@@ -5,6 +5,9 @@
 
 import { supabase, STORAGE_BUCKETS, getSessionFilePath } from '../lib/supabase';
 import type { ResumeInsert, StorageResponse, FileUploadResult } from '../types/database';
+import { validateFileUploadSecurity, validateFileType, validateFileSize } from '../utils/fileSecurityValidation';
+import { sanitizeFilename, validateSessionId } from '../utils/inputSanitization';
+import { checkRateLimit, RateLimitError, formatRateLimitError } from '../utils/rateLimiting';
 
 export interface UploadProgress {
   loaded: number;
@@ -38,12 +41,52 @@ export class UploadService {
     const { onProgress, signal } = options;
 
     try {
-      // Validate file before upload
+      // Validate session ID
+      const sessionValidation = validateSessionId(sessionId);
+      if (!sessionValidation.isValid) {
+        throw new Error(`Invalid session ID: ${sessionValidation.errors.join(', ')}`);
+      }
+
+      // Check rate limit for uploads
+      const rateLimitResult = checkRateLimit(sessionId, 'UPLOAD');
+      if (!rateLimitResult.allowed) {
+        throw new RateLimitError(rateLimitResult, formatRateLimitError(rateLimitResult));
+      }
+
+      // Validate file type and size
+      const typeValidation = validateFileType(file);
+      if (!typeValidation.isValid) {
+        throw new Error(typeValidation.error);
+      }
+
+      const sizeValidation = validateFileSize(file);
+      if (!sizeValidation.isValid) {
+        throw new Error(sizeValidation.error);
+      }
+
+      // Perform comprehensive security validation
+      const securityValidation = await validateFileUploadSecurity(file, {
+        enableVirusScanning: true,
+        enableMalwareDetection: true,
+        enableContentValidation: true,
+        maxScanTime: 5000,
+      });
+
+      if (!securityValidation.isSecure) {
+        throw new Error(`File security validation failed: ${securityValidation.threats.join(', ')}`);
+      }
+
+      // Log security warnings if any
+      if (securityValidation.warnings.length > 0) {
+        console.warn('File upload security warnings:', securityValidation.warnings);
+      }
+
+      // Validate file before upload (legacy validation)
       this.validateFile(file);
 
       // Generate unique filename to prevent conflicts
       const timestamp = Date.now();
-      const sanitizedName = this.sanitizeFilename(file.name);
+      const sanitizedName = sanitizeFilename(securityValidation.sanitizedFilename || file.name);
       const uniqueFilename = `${timestamp}_${sanitizedName}`;
       const filePath = getSessionFilePath(sessionId, uniqueFilename);
 
@@ -243,15 +286,11 @@ export class UploadService {
   }
 
   /**
-   * Sanitize filename to prevent issues
+   * Sanitize filename to prevent issues (deprecated - use inputSanitization utility)
    */
   private static sanitizeFilename(filename: string): string {
-    // Remove or replace problematic characters
-    return filename
-      .replace(/[^a-zA-Z0-9.-]/g, '_') // Replace special chars with underscore
-      .replace(/_{2,}/g, '_') // Replace multiple underscores with single
-      .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
-      .toLowerCase();
+    // Use the centralized sanitization utility
+    return sanitizeFilename(filename);
   }
 
   /**

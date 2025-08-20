@@ -18,6 +18,19 @@ import {
   log,
   measureExecutionTime
 } from '../_shared/config.ts';
+import { 
+  handleSecureCorsPreflightRequest,
+  addSecurityHeaders,
+  validateRequestHeaders,
+  sanitizeRequestHeaders,
+  createSecureErrorResponse,
+  createSecureSuccessResponse
+} from '../_shared/security-headers.ts';
+import { 
+  ServerRateLimiter,
+  withServerRateLimit,
+  extractClientIP
+} from '../_shared/rate-limiter.ts';
 
 interface AnalysisRequest {
   resumeId: string;
@@ -221,32 +234,88 @@ async function verifyResumeAccess(
 
 export default async function handler(req: Request): Promise<Response> {
   try {
-    // Handle CORS preflight
+    // Handle CORS preflight with security headers
     if (req.method === 'OPTIONS') {
-      return handleCorsPreflightRequest(req);
+      return handleSecureCorsPreflightRequest(req);
     }
 
     // Validate request method
     validateRequestMethod(req, ['POST']);
 
-    // Extract session ID
-    const sessionId = extractSessionId(req);
-    log('info', 'Processing CV analysis request', { sessionId });
-
-    // Parse request body
-    const requestBody = await req.json();
-    const { resumeId, pdfPath }: AnalysisRequest = requestBody;
-
-    // Validate required fields
-    if (!resumeId || typeof resumeId !== 'string') {
-      return addCorsHeaders(
-        createErrorResponse('resumeId is required and must be a string', 400, 'validation_error'),
+    // Validate request headers for security
+    const headerValidation = validateRequestHeaders(req);
+    if (!headerValidation.isValid) {
+      return createSecureErrorResponse(
+        `Invalid request headers: ${headerValidation.errors.join(', ')}`,
+        400,
         req
       );
     }
 
+    // Sanitize request headers
+    const sanitizedHeaders = sanitizeRequestHeaders(req);
+
+    // Extract session ID
+    const sessionId = extractSessionId(req);
+    log('info', 'Processing CV analysis request', { sessionId });
+
     // Load configuration
     const config = loadConfig();
+
+    // Initialize rate limiter
+    const rateLimiter = new ServerRateLimiter(config.supabaseUrl, config.supabaseServiceKey);
+
+    // Apply rate limiting
+    const { result, rateLimitResult } = await withServerRateLimit(
+      rateLimiter,
+      req,
+      sessionId,
+      'ANALYZE_CV',
+      async () => {
+        // Parse and validate request body
+        const requestBody = await req.json();
+        const { resumeId, pdfPath }: AnalysisRequest = requestBody;
+
+        // Validate required fields with input sanitization
+        if (!resumeId || typeof resumeId !== 'string' || resumeId.trim().length === 0) {
+          throw new Error('resumeId is required and must be a non-empty string');
+        }
+
+        // Sanitize resumeId (should be UUID format)
+        const sanitizedResumeId = resumeId.replace(/[^a-f0-9-]/gi, '');
+        if (sanitizedResumeId.length !== resumeId.length) {
+          throw new Error('Invalid resumeId format');
+        }
+
+        return { resumeId: sanitizedResumeId, pdfPath };
+      }
+    );
+
+    if (!rateLimitResult.allowed) {
+      const response = createSecureErrorResponse(
+        'Rate limit exceeded. Please try again later.',
+        429,
+        req
+      );
+      
+      // Add rate limit headers
+      const headers = new Headers(response.headers);
+      headers.set('X-RateLimit-Limit', '3'); // ANALYZE_CV max requests
+      headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
+      headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.resetTime / 1000).toString());
+      if (rateLimitResult.retryAfter) {
+        headers.set('Retry-After', Math.ceil(rateLimitResult.retryAfter / 1000).toString());
+      }
+
+      return new Response(response.body, {
+        status: response.status,
+        headers,
+      });
+    }
+
+    const { resumeId, pdfPath } = result!;
+
+
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -310,13 +379,23 @@ export default async function handler(req: Request): Promise<Response> {
       atsScore: analysis.ats_compatibility.score
     });
 
-    // Return success response
-    const response = createSuccessResponse(
+    // Return success response with security headers
+    const response = createSecureSuccessResponse(
       responseData, 
       200, 
-      'CV analysis completed successfully'
+      req
     );
-    return addCorsHeaders(response, req);
+    
+    // Add rate limit headers to success response
+    const headers = new Headers(response.headers);
+    headers.set('X-RateLimit-Limit', '3'); // ANALYZE_CV max requests
+    headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
+    headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.resetTime / 1000).toString());
+
+    return new Response(response.body, {
+      status: response.status,
+      headers,
+    });
 
   } catch (error) {
     log('error', 'CV analysis failed', { 
@@ -324,8 +403,25 @@ export default async function handler(req: Request): Promise<Response> {
       stack: error.stack 
     });
     
-    const errorResponse = handleOpenAIError(error);
-    return addCorsHeaders(errorResponse, req);
+    // Create secure error response
+    let errorMessage = 'An error occurred during CV analysis';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      // Sanitize error message to prevent information leakage
+      if (error.message.includes('Rate limit')) {
+        errorMessage = 'Rate limit exceeded. Please try again later.';
+        statusCode = 429;
+      } else if (error.message.includes('validation')) {
+        errorMessage = 'Invalid request data';
+        statusCode = 400;
+      } else if (error.message.includes('OpenAI')) {
+        errorMessage = 'AI service temporarily unavailable';
+        statusCode = 503;
+      }
+    }
+    
+    return createSecureErrorResponse(errorMessage, statusCode, req);
   }
 }
 

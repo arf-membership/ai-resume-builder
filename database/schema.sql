@@ -57,3 +57,33 @@ CREATE TRIGGER update_resumes_updated_at
 CREATE TRIGGER update_ai_provider_settings_updated_at 
     BEFORE UPDATE ON ai_provider_settings 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Create rate_limits table for server-side rate limiting
+CREATE TABLE IF NOT EXISTS rate_limits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    key TEXT NOT NULL UNIQUE,
+    count INTEGER NOT NULL DEFAULT 1,
+    window_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    client_ip INET,
+    user_agent TEXT,
+    endpoint TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for efficient querying
+CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_expires_at ON rate_limits(expires_at);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_client_ip ON rate_limits(client_ip);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_endpoint ON rate_limits(endpoint);
+
+-- Create partial index for active rate limits only
+CREATE INDEX IF NOT EXISTS idx_rate_limits_active 
+ON rate_limits(key, expires_at) 
+WHERE expires_at > NOW();
+
+-- Create trigger to update updated_at timestamp for rate_limits
+CREATE TRIGGER update_rate_limits_updated_at 
+    BEFORE UPDATE ON rate_limits 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
