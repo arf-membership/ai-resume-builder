@@ -12,7 +12,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
-    "perf:analyze": "node scripts/analyze-performance.js"
+    "perf:analyze": "node scripts/analyze-performance.js",
+    "deploy:prepare": "node scripts/prepare-deployment.js",
+    "deploy:check": "npm run lint && npm run test:run && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
