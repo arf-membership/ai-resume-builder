@@ -4,8 +4,8 @@
  */
 
 import React, { Suspense } from 'react';
-import { LoadingIndicator } from './LoadingIndicator';
-import { ErrorBoundary } from './ErrorBoundary';
+import LoadingSpinner from './LoadingIndicator';
+import ErrorBoundary from './ErrorBoundary';
 
 // Lazy load heavy components
 const AnalysisResults = React.lazy(() => 
@@ -57,7 +57,7 @@ const StateManagementDemo = React.lazy(() =>
 const ComponentLoader: React.FC<{ name?: string }> = ({ name }) => (
   <div className="flex items-center justify-center p-8">
     <div className="text-center">
-      <LoadingIndicator size="lg" />
+      <LoadingSpinner size="lg" />
       <p className="text-sm text-gray-600 mt-2">
         {name ? `Loading ${name}...` : 'Loading component...'}
       </p>
@@ -65,32 +65,7 @@ const ComponentLoader: React.FC<{ name?: string }> = ({ name }) => (
   </div>
 );
 
-// Error fallback component
-const ComponentError: React.FC<{ error: Error; retry: () => void; name?: string }> = ({ 
-  error, 
-  retry, 
-  name 
-}) => (
-  <div className="flex flex-col items-center justify-center p-8 bg-red-50 border border-red-200 rounded-lg">
-    <div className="text-center">
-      <svg className="w-8 h-8 text-red-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <h3 className="text-lg font-medium text-red-800 mb-1">
-        Failed to load {name || 'component'}
-      </h3>
-      <p className="text-sm text-red-600 mb-4">
-        {error.message || 'An unexpected error occurred'}
-      </p>
-      <button
-        onClick={retry}
-        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-      >
-        Try Again
-      </button>
-    </div>
-  </div>
-);
+
 
 // Higher-order component for lazy loading with error boundary
 const withLazyLoading = <P extends object>(
@@ -99,9 +74,21 @@ const withLazyLoading = <P extends object>(
 ) => {
   return React.forwardRef<any, P>((props, ref) => (
     <ErrorBoundary
-      fallback={(error, retry) => (
-        <ComponentError error={error} retry={retry} name={componentName} />
-      )}
+      fallback={
+        <div className="flex flex-col items-center justify-center p-8 bg-red-50 border border-red-200 rounded-lg">
+          <div className="text-center">
+            <svg className="w-8 h-8 text-red-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-medium text-red-800 mb-1">
+              Failed to load {componentName || 'component'}
+            </h3>
+            <p className="text-sm text-red-600 mb-4">
+              An unexpected error occurred while loading this component
+            </p>
+          </div>
+        </div>
+      }
     >
       <Suspense fallback={<ComponentLoader name={componentName} />}>
         <LazyComponent {...props} ref={ref} />

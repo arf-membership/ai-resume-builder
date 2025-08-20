@@ -16,7 +16,7 @@ export interface SecurityHeadersConfig {
 }
 
 const DEFAULT_SECURITY_CONFIG: SecurityHeadersConfig = {
-  corsOrigins: ['http://localhost:5173', 'https://*.vercel.app', 'https://*.netlify.app'],
+  corsOrigins: ['http://localhost:5173', 'http://localhost:5174', 'https://*.vercel.app', 'https://*.netlify.app'],
   allowCredentials: false,
   maxAge: 86400, // 24 hours
   enableHSTS: true,

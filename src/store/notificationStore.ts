@@ -3,6 +3,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface Notification {
   id: string;
@@ -76,7 +77,7 @@ const notificationStoreSelector = (state: NotificationStore) => ({
 
 // Convenience hooks for different notification types
 export const useNotifications = () => {
-  const { notifications, addNotification, removeNotification, clearNotifications } = useNotificationStore(notificationStoreSelector);
+  const { notifications, addNotification, removeNotification, clearNotifications } = useNotificationStore(useShallow(notificationStoreSelector));
   
   return {
     notifications,

@@ -4,7 +4,7 @@
  * Requirements: 2.3, 2.4, 2.5, 9.2
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createOpenAIService, handleOpenAIError } from '../_shared/openai-service.ts';
 import { extractAndValidatePDFText } from '../_shared/pdf-processor.ts';
 import { 
@@ -232,7 +232,7 @@ async function verifyResumeAccess(
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+Deno.serve(async (req: Request): Promise<Response> => {
   try {
     // Handle CORS preflight with security headers
     if (req.method === 'OPTIONS') {
@@ -255,9 +255,39 @@ export default async function handler(req: Request): Promise<Response> {
     // Sanitize request headers
     const sanitizedHeaders = sanitizeRequestHeaders(req);
 
+    // Parse and validate request body
+    let requestBody;
+    try {
+      const bodyText = await req.text();
+      
+      if (!bodyText || bodyText.trim() === '') {
+        throw new Error('Request body is empty');
+      }
+      requestBody = JSON.parse(bodyText);
+    } catch (error) {
+      log('error', 'Request body parsing failed', { error: error.message });
+      if (error.message === 'Request body is empty') {
+        throw error;
+      }
+      throw new Error('Invalid JSON in request body');
+    }
+    
+    const { resumeId, pdfPath: originalPdfPath }: AnalysisRequest = requestBody;
+
+    // Validate required fields with input sanitization
+    if (!resumeId || typeof resumeId !== 'string' || resumeId.trim().length === 0) {
+      throw new Error('resumeId is required and must be a non-empty string');
+    }
+
+    // Sanitize resumeId (should be UUID format)
+    const sanitizedResumeId = resumeId.replace(/[^a-f0-9-]/gi, '');
+    if (sanitizedResumeId.length !== resumeId.length) {
+      throw new Error('Invalid resumeId format');
+    }
+
     // Extract session ID
     const sessionId = extractSessionId(req);
-    log('info', 'Processing CV analysis request', { sessionId });
+    log('info', 'Processing CV analysis request', { sessionId, resumeId: sanitizedResumeId });
 
     // Load configuration
     const config = loadConfig();
@@ -272,22 +302,7 @@ export default async function handler(req: Request): Promise<Response> {
       sessionId,
       'ANALYZE_CV',
       async () => {
-        // Parse and validate request body
-        const requestBody = await req.json();
-        const { resumeId, pdfPath }: AnalysisRequest = requestBody;
-
-        // Validate required fields with input sanitization
-        if (!resumeId || typeof resumeId !== 'string' || resumeId.trim().length === 0) {
-          throw new Error('resumeId is required and must be a non-empty string');
-        }
-
-        // Sanitize resumeId (should be UUID format)
-        const sanitizedResumeId = resumeId.replace(/[^a-f0-9-]/gi, '');
-        if (sanitizedResumeId.length !== resumeId.length) {
-          throw new Error('Invalid resumeId format');
-        }
-
-        return { resumeId: sanitizedResumeId, pdfPath };
+        return { resumeId: sanitizedResumeId, pdfPath: originalPdfPath };
       }
     );
 
@@ -313,7 +328,7 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
-    const { resumeId, pdfPath } = result!;
+    const { resumeId: validatedResumeId, pdfPath: requestPdfPath } = result!;
 
 
 
@@ -325,12 +340,12 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Verify resume access and get PDF path
     const { pdfPath: verifiedPdfPath } = await measureExecutionTime(
-      () => verifyResumeAccess(supabaseClient, resumeId, sessionId),
+      () => verifyResumeAccess(supabaseClient, validatedResumeId, sessionId),
       'Resume verification'
     );
 
     // Use provided pdfPath or verified path
-    const finalPdfPath = pdfPath || verifiedPdfPath;
+    const finalPdfPath = requestPdfPath || verifiedPdfPath;
 
     // Extract text from PDF
     const cvText = await measureExecutionTime(
@@ -350,7 +365,7 @@ export default async function handler(req: Request): Promise<Response> {
     
     log('info', 'Starting OpenAI CV analysis', { 
       sessionId, 
-      resumeId,
+      resumeId: validatedResumeId,
       textLength: cvText.length 
     });
 
@@ -361,19 +376,19 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Store analysis results in database
     await measureExecutionTime(
-      () => storeAnalysisResults(supabaseClient, resumeId, sessionId, analysis),
+      () => storeAnalysisResults(supabaseClient, validatedResumeId, sessionId, analysis),
       'Store analysis results'
     );
 
     // Prepare response
     const responseData: AnalysisResponse = {
-      resumeId,
+      resumeId: validatedResumeId,
       analysis
     };
 
     log('info', 'CV analysis completed successfully', { 
       sessionId, 
-      resumeId,
+      resumeId: validatedResumeId,
       overallScore: analysis.overall_score,
       sectionsCount: analysis.sections.length,
       atsScore: analysis.ats_compatibility.score
@@ -423,9 +438,4 @@ export default async function handler(req: Request): Promise<Response> {
     
     return createSecureErrorResponse(errorMessage, statusCode, req);
   }
-}
-
-// Deno Deploy configuration
-export const config = {
-  path: '/analyze-cv',
-};
+});

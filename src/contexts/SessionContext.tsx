@@ -28,7 +28,7 @@ interface SessionProviderProps {
 export function SessionProvider({ children }: SessionProviderProps) {
   // Simplified session provider - no complex state management
   const [sessionData, setSessionData] = useState<SessionData | null>({
-    sessionId: `simple-session-${Date.now()}`,
+    sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     createdAt: new Date().toISOString(),
     lastActivity: new Date().toISOString(),
   });

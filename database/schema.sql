@@ -87,3 +87,18 @@ WHERE expires_at > NOW();
 CREATE TRIGGER update_rate_limits_updated_at 
     BEFORE UPDATE ON rate_limits 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Function to set configuration variables for RLS policies
+CREATE OR REPLACE FUNCTION public.set_config(
+    setting_name TEXT,
+    setting_value TEXT,
+    is_local BOOLEAN DEFAULT FALSE
+)
+RETURNS TEXT
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Use PostgreSQL's built-in set_config function
+    RETURN pg_catalog.set_config(setting_name, setting_value, is_local);
+END;
+$$ LANGUAGE plpgsql;

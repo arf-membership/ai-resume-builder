@@ -3,7 +3,6 @@
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { useNotifications } from '../store/notificationStore';
 import { useCVStore } from '../store';
 
 interface Props {
@@ -33,13 +32,21 @@ class ErrorBoundary extends Component<Props, State> {
     // Log error to store and external services
     this.setState({ error, errorInfo });
     
-    // Add error to global store
-    const store = useCVStore.getState();
-    store.addError({
-      type: 'validation',
-      message: `React Error: ${error.message}`,
-      details: errorInfo.componentStack || undefined,
-    });
+    // Add error to global store safely to prevent infinite loops
+    try {
+      const store = useCVStore.getState();
+      // Only add error if it's not already causing a store error
+      if (!error.message.includes('Maximum update depth')) {
+        store.addError({
+          type: 'validation',
+          message: `React Error: ${error.message}`,
+          details: errorInfo.componentStack || undefined,
+        });
+      }
+    } catch (storeError) {
+      // If adding to store fails, just log it without causing another error
+      console.warn('Failed to add error to store:', storeError);
+    }
 
     // Call custom error handler if provided
     if (this.props.onError) {

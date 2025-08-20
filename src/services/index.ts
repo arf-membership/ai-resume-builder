@@ -19,6 +19,8 @@ export { PDFGenerationService } from './pdfGenerationService';
 
 export { CacheService } from './cacheService';
 
+export { AnalysisService } from './analysisService';
+
 export { PDFOptimizationService, pdfOptimizationService } from './pdfOptimizationService';
 
 export { 

@@ -6,16 +6,15 @@
 import React, { useEffect, useState } from 'react';
 import { LandingPage } from './LandingPage';
 import { AnalysisResults } from './AnalysisResults';
-import { CVCanvas } from './CVCanvas';
 import { ChatInterface } from './ChatInterface';
-import { NotificationContainer } from './NotificationContainer';
-import { ErrorBoundary } from './ErrorBoundary';
-import { LoadingOverlay } from './LoadingOverlay';
+import CVCanvas from './CVCanvas';
 import { useSession } from '../contexts/SessionContext';
-import { useCVStore, useStoreActions, useAnalysisState, useUploadState, useChatState } from '../store';
+import { useCVStore, useStoreActions, useAnalysisState, useUploadState, useEditingState, useChatState } from '../store';
 import { useNotifications } from '../store/notificationStore';
 import { performanceMonitoring } from '../services/performanceMonitoringService';
-import type { CVAnalysisResult } from '../types/cv';
+import ErrorBoundary from './ErrorBoundary';
+import NotificationContainer from './NotificationToast';
+import { LoadingOverlay } from './LoadingIndicator';
 
 // Application flow states
 type AppFlow = 'landing' | 'uploading' | 'analyzing' | 'results' | 'editing' | 'generating';
@@ -28,9 +27,10 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
   initialFlow = 'landing' 
 }) => {
   const { sessionId } = useSession();
-  const { showError, showSuccess, showInfo } = useNotifications();
+  const { showError, showSuccess } = useNotifications();
   const { isAnalyzing, analysisResult } = useAnalysisState();
   const { isUploading, uploadProgress } = useUploadState();
+  const { editingSection } = useEditingState();
   const chatOpen = useChatState();
   const actions = useStoreActions();
   
@@ -47,26 +47,29 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
     const startTime = Date.now();
     return () => {
       const duration = Date.now() - startTime;
-      performanceMonitoring.trackPerformance('session_duration', duration);
+      performanceMonitoring.trackSyncOperation('session_duration', () => duration);
     };
   }, [actions]);
 
+  /* Future upload integration handlers - currently unused but kept for future development
+  
   // Handle upload completion
   const handleUploadComplete = async (fileData: { resumeId: string; filePath: string }) => {
     try {
+      if (!sessionId) {
+        throw new Error('Session not initialized. Please refresh the page.');
+      }
+
       setCurrentFlow('analyzing');
       setIsLoading(true);
       setLoadingMessage('Analyzing your CV with AI...');
       
       actions.setIsAnalyzing(true);
       
-      // Import and use analysis service
-      const { AnalysisService } = await import('../services/analysisService');
-      
       const analysisResult = await AnalysisService.analyzeCV(
         fileData.resumeId,
         sessionId,
-        (progress) => {
+        (progress: number) => {
           setLoadingMessage(`Analyzing CV... ${Math.round(progress)}%`);
         }
       );
@@ -101,6 +104,8 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
     setCurrentFlow('landing');
     actions.setUploadProgress(0);
   };
+  
+  */
 
   // Handle section editing
   const handleSectionEdit = async (sectionName: string) => {
@@ -125,6 +130,10 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
         throw new Error('Section not found');
       }
       
+      if (!sessionId) {
+        throw new Error('Session not initialized. Please refresh the page.');
+      }
+
       const result = await SectionEditService.editSection(
         currentResume.id,
         sectionName,
@@ -132,8 +141,10 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
         section.suggestions,
         sessionId,
         undefined, // No additional context for now
-        (progress) => {
-          setLoadingMessage(progress);
+        {
+          onProgress: (progress: string) => {
+            setLoadingMessage(progress);
+          }
         }
       );
       
@@ -169,20 +180,26 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
         throw new Error('No resume data available');
       }
       
+      if (!sessionId) {
+        throw new Error('Session not initialized. Please refresh the page.');
+      }
+
       const result = await PDFGenerationService.generatePDF(
         currentResume.id,
-        analysisResult,
         sessionId,
-        (progress) => {
-          setLoadingMessage(`Generating PDF... ${Math.round(progress)}%`);
+        [], // No section updates for now
+        {
+          onProgress: (progress: { stage: string; percentage: number }) => {
+            setLoadingMessage(`${progress.stage}... ${Math.round(progress.percentage)}%`);
+          }
         }
       );
       
-      actions.updateGeneratedPdfPath(result.filePath);
+      actions.updateGeneratedPdfPath(result.generatedPdfPath);
       
       // Trigger download
       const link = document.createElement('a');
-      link.href = result.downloadUrl;
+      link.href = result.generatedPdfUrl;
       link.download = 'improved-cv.pdf';
       document.body.appendChild(link);
       link.click();
@@ -221,13 +238,7 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
     switch (currentFlow) {
       case 'landing':
       case 'uploading':
-        return (
-          <LandingPage
-            onUploadComplete={handleUploadComplete}
-            onUploadProgress={handleUploadProgress}
-            onUploadError={handleUploadError}
-          />
-        );
+        return <LandingPage onAnalyzeCV={handleAnalyzeCv} />;
       
       case 'analyzing':
         return (
@@ -267,6 +278,7 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
                 <div className="space-y-6">
                   <AnalysisResults
                     analysisData={analysisResult}
+                    resumeId={useCVStore.getState().currentResume?.id || ''}
                     onSectionEdit={handleSectionEdit}
                     onDownloadPDF={handleDownloadPDF}
                   />
@@ -276,7 +288,8 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
                 <div className="lg:sticky lg:top-8">
                   <CVCanvas
                     pdfUrl={useCVStore.getState().currentResume?.original_pdf_path || ''}
-                    analysisData={analysisResult}
+                    resumeId={useCVStore.getState().currentResume?.id || ''}
+                    sessionId={sessionId || ''}
                   />
                 </div>
               </div>
@@ -310,7 +323,15 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
         {/* Chat Interface */}
         {chatOpen && (
           <ChatInterface
-            onComplete={handleChatComplete}
+            isOpen={chatOpen}
+            sectionName={editingSection || ''}
+            resumeId={useCVStore.getState().currentResume?.id || ''}
+            onComplete={(updatedContent: string) => {
+              // We need the section name, so get it from the store
+              if (editingSection) {
+                handleChatComplete(updatedContent, editingSection);
+              }
+            }}
             onClose={() => actions.setChatOpen(false)}
           />
         )}
@@ -318,6 +339,7 @@ export const AppIntegration: React.FC<AppIntegrationProps> = ({
         {/* Loading Overlay */}
         {(isLoading || isUploading || isAnalyzing) && (
           <LoadingOverlay
+            isVisible={true}
             message={loadingMessage || 'Processing...'}
             progress={isUploading ? uploadProgress : undefined}
           />

@@ -5,8 +5,10 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { secureSessionManager, SessionSecurityInfo } from '../utils/secureSessionManagement';
-import { checkRateLimit, RateLimitResult } from '../utils/rateLimiting';
+import { secureSessionManager } from '../utils/secureSessionManagement';
+import type { SessionSecurityInfo } from '../utils/secureSessionManagement';
+import { checkRateLimit } from '../utils/rateLimiting';
+import type { RateLimitResult } from '../utils/rateLimiting';
 import { getSecurityConfig, validateSecurityConfig } from '../config/security';
 import { useNotifications } from '../store/notificationStore';
 

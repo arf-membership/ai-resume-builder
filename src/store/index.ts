@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import type { AppState, ErrorState } from '../types/state';
 import type { CVAnalysisResult, CVSection } from '../types/cv';
 import type { ResumeRecord } from '../types/database';
@@ -271,7 +272,7 @@ const errorsSelector = (state: CVStore) => state.errors;
 export const useSessionId = () => useCVStore(sessionIdSelector);
 export const useCurrentResume = () => useCVStore(currentResumeSelector);
 export const useAnalysisResult = () => useCVStore(analysisResultSelector);
-// Memoized selectors to prevent infinite loops
+
 const uploadStateSelector = (state: CVStore) => ({
   uploadProgress: state.uploadProgress,
   isUploading: state.isUploading,
@@ -292,11 +293,11 @@ const pdfStateSelector = (state: CVStore) => ({
   generatedPdfPath: state.currentResume?.generated_pdf_path,
 });
 
-export const useUploadState = () => useCVStore(uploadStateSelector);
-export const useAnalysisState = () => useCVStore(analysisStateSelector);
-export const useEditingState = () => useCVStore(editingStateSelector);
+export const useUploadState = () => useCVStore(useShallow(uploadStateSelector));
+export const useAnalysisState = () => useCVStore(useShallow(analysisStateSelector));
+export const useEditingState = () => useCVStore(useShallow(editingStateSelector));
 export const useChatState = () => useCVStore(chatOpenSelector);
-export const usePDFState = () => useCVStore(pdfStateSelector);
+export const usePDFState = () => useCVStore(useShallow(pdfStateSelector));
 export const useErrors = () => useCVStore(errorsSelector);
 
 // Memoized actions selector to prevent infinite loops
@@ -338,6 +339,6 @@ const actionsSelector = (state: CVStore) => ({
 });
 
 // Action hooks for cleaner component usage
-export const useStoreActions = () => useCVStore(actionsSelector);
+export const useStoreActions = () => useCVStore(useShallow(actionsSelector));
 
 export default useCVStore;

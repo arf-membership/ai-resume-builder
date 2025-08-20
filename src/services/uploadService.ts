@@ -3,7 +3,7 @@
  * Handles PDF uploads with progress tracking and error handling
  */
 
-import { supabase, STORAGE_BUCKETS, getSessionFilePath } from '../lib/supabase';
+import { supabase, STORAGE_BUCKETS, getSessionFilePath, setSessionId } from '../lib/supabase';
 import type { ResumeInsert, StorageResponse, FileUploadResult } from '../types/database';
 import { validateFileUploadSecurity, validateFileType, validateFileSize } from '../utils/fileSecurityValidation';
 import { sanitizeFilename, validateSessionId } from '../utils/inputSanitization';
@@ -94,6 +94,9 @@ export class UploadService {
       if (signal?.aborted) {
         throw new Error('Upload was cancelled');
       }
+
+      // Set session ID for RLS policies before upload
+      await setSessionId(sessionId);
 
       // Upload file to Supabase Storage with progress tracking
       const uploadResult = await this.uploadWithProgress(
@@ -228,6 +231,9 @@ export class UploadService {
     sessionId: string,
     filePath: string
   ): Promise<{ id: string }> {
+    // Set session ID for RLS policies before database insert
+    await setSessionId(sessionId);
+
     const resumeData: ResumeInsert = {
       user_session_id: sessionId,
       original_pdf_path: filePath,
