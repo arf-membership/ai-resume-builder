@@ -4,7 +4,7 @@
  * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1';
 import { 
   handleCorsPreflightRequest, 
@@ -174,7 +174,16 @@ async function createEnhancedPDF(
  */
 async function applyContentUpdates(
   pdf: PDFDocument, 
-  sections: GeneratePDFRequest['updatedContent']['sections']
+  sections: Array<{
+    section_name: string;
+    content: string;
+    position?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  }>
 ): Promise<void> {
   try {
     const pages = pdf.getPages();
@@ -431,7 +440,7 @@ async function updateResumeRecord(
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+Deno.serve(async (req: Request): Promise<Response> => {
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
@@ -531,9 +540,4 @@ export default async function handler(req: Request): Promise<Response> {
     );
     return addCorsHeaders(errorResponse, req);
   }
-}
-
-// Deno Deploy configuration
-export const config = {
-  path: '/generate-pdf',
-};
+});

@@ -47,8 +47,28 @@ export const getSessionFilePath = (sessionId: string, filename: string): string 
   return `${sessionId}/${filename}`;
 };
 
-// Helper function to get public URL for a file
-export const getFileUrl = (bucket: string, path: string): string => {
+// Helper function to get file URL (signed URL for private buckets)
+export const getFileUrl = async (bucket: string, path: string): Promise<string | null> => {
+  try {
+    // Try to get a signed URL first (works for private buckets)
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 3600); // 1 hour expiry
+    
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      return null;
+    }
+    
+    return data.signedUrl;
+  } catch (error) {
+    console.error('Error getting file URL:', error);
+    return null;
+  }
+};
+
+// Synchronous version for backward compatibility (returns public URL)
+export const getFileUrlSync = (bucket: string, path: string): string => {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 };

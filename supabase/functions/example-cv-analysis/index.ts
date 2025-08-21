@@ -17,7 +17,7 @@ interface AnalysisRequest {
   cvText: string;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+Deno.serve(async (req: Request): Promise<Response> => {
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
@@ -59,9 +59,4 @@ export default async function handler(req: Request): Promise<Response> {
     const errorResponse = handleOpenAIError(error);
     return addCorsHeaders(errorResponse, req);
   }
-}
-
-// Deno Deploy configuration
-export const config = {
-  path: '/example-cv-analysis',
-};
+});

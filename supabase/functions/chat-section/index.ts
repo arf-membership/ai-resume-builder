@@ -3,11 +3,12 @@
  * Handles AI-powered chat interactions for gathering additional information during section editing
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createGlobalChatPrompt, parseOpenAIResponse, OPENAI_CONFIGS } from '../_shared/prompt-utils.ts';
+import type { GlobalChatResponse, ChatMessage, CVAnalysisData } from '../_shared/types.ts';
 import OpenAI from 'https://esm.sh/openai@4.20.1';
 
-interface ChatMessage {
+interface LegacyChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -15,10 +16,14 @@ interface ChatMessage {
 }
 
 interface ChatRequest {
-  action: 'initialize' | 'send' | 'complete';
+  action?: 'initialize' | 'send' | 'complete';
   resumeId: string;
-  sectionName: string;
-  messages?: ChatMessage[];
+  sessionId?: string;
+  sectionName?: string; // Optional for backward compatibility
+  message?: string; // For global chat
+  conversationHistory?: ChatMessage[];
+  currentCV?: any; // Current CV analysis data
+  messages?: ChatMessage[]; // For backward compatibility
 }
 
 interface ChatResponse {
@@ -26,6 +31,8 @@ interface ChatResponse {
   requiresMoreInfo: boolean;
   suggestedQuestions?: string[];
   updatedContent?: string;
+  response?: string; // For global chat response
+  cvUpdates?: any; // For CV improvements
 }
 
 // CORS headers
@@ -35,7 +42,71 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+// Handle global CV improvement chat
+async function handleGlobalChat({
+  resumeId,
+  sessionId,
+  message,
+  conversationHistory,
+  currentCV,
+  openai,
+  supabaseClient
+}: {
+  resumeId: string;
+  sessionId?: string;
+  message: string;
+  conversationHistory: ChatMessage[];
+  currentCV: CVAnalysisData;
+  openai: any;
+  supabaseClient: any;
+}): Promise<Response> {
+  try {
+    // Use the new structured prompt system
+    const messages = createGlobalChatPrompt(message, currentCV, conversationHistory);
+
+    // Get AI response using structured config
+    const completion = await openai.chat.completions.create({
+      ...OPENAI_CONFIGS.CHAT,
+      messages,
+    });
+
+    const aiResponseContent = completion.choices[0].message.content;
+    if (!aiResponseContent) {
+      throw new Error('No response content from OpenAI');
+    }
+
+    // Parse the structured JSON response
+    const parsedResponse = parseOpenAIResponse<GlobalChatResponse>(aiResponseContent);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        response: parsedResponse.response,
+        cvUpdates: parsedResponse.cv_updates,
+        suggestions: parsedResponse.suggestions,
+        nextSteps: parsedResponse.next_steps
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('Global chat error:', error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Failed to process chat message',
+        details: error.message
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -64,14 +135,37 @@ serve(async (req) => {
     });
 
     // Parse request
-    const { action, resumeId, sectionName, messages }: ChatRequest = await req.json();
+    const requestBody: ChatRequest = await req.json();
+    const { 
+      action, 
+      resumeId, 
+      sessionId,
+      sectionName, 
+      message,
+      conversationHistory,
+      currentCV,
+      messages 
+    } = requestBody;
 
-    // Validate request
+    // Handle global chat mode (new approach)
+    if (message && conversationHistory !== undefined && currentCV) {
+      return await handleGlobalChat({
+        resumeId,
+        sessionId,
+        message,
+        conversationHistory,
+        currentCV,
+        openai,
+        supabaseClient
+      });
+    }
+
+    // Legacy section-based chat validation
     if (!action || !resumeId || !sectionName) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Missing required fields: action, resumeId, sectionName'
+          error: 'Missing required fields: action, resumeId, sectionName or message for global chat'
         }),
         {
           status: 400,
@@ -80,9 +174,9 @@ serve(async (req) => {
       );
     }
 
-    // Get session ID from headers
-    const sessionId = req.headers.get('x-session-id');
-    if (!sessionId) {
+    // Get session ID from headers for legacy support
+    const legacySessionId = req.headers.get('x-session-id');
+    if (!legacySessionId) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -100,7 +194,7 @@ serve(async (req) => {
       .from('resumes')
       .select('*')
       .eq('id', resumeId)
-      .eq('user_session_id', sessionId)
+      .eq('user_session_id', legacySessionId)
       .single();
 
     if (resumeError || !resumeData) {
@@ -237,10 +331,8 @@ Respond with just the question, no additional text.`;
   }
 
   const message: ChatMessage = {
-    id: `assistant-${Date.now()}`,
     role: 'assistant',
-    content: aiResponse,
-    timestamp: new Date().toISOString()
+    content: aiResponse
   };
 
   return {
@@ -298,10 +390,8 @@ Respond naturally as if having a conversation.`;
   }
 
   const message: ChatMessage = {
-    id: `assistant-${Date.now()}`,
     role: 'assistant',
-    content: aiResponse,
-    timestamp: new Date().toISOString()
+    content: aiResponse
   };
 
   // Determine if more info is needed based on conversation length and content

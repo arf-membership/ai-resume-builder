@@ -4,7 +4,7 @@
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createOpenAIService, handleOpenAIError } from '../_shared/openai-service.ts';
 import { 
   handleCorsPreflightRequest, 
@@ -175,7 +175,7 @@ async function updateAnalysisData(
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+Deno.serve(async (req: Request): Promise<Response> => {
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
@@ -314,9 +314,4 @@ export default async function handler(req: Request): Promise<Response> {
     const errorResponse = handleOpenAIError(error);
     return addCorsHeaders(errorResponse, req);
   }
-}
-
-// Deno Deploy configuration
-export const config = {
-  path: '/edit-section',
-};
+});

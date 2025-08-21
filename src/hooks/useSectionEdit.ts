@@ -29,6 +29,7 @@ export interface SectionEditActions {
 
 export interface UseSectionEditOptions {
   resumeId: string;
+  sessionId?: string;
   initialAnalysisData: CVAnalysisResult;
   onSectionEdit?: (sectionName: string) => void;
   onError?: (error: string) => void;
@@ -39,6 +40,7 @@ export interface UseSectionEditOptions {
  */
 export function useSectionEdit({
   resumeId,
+  sessionId,
   initialAnalysisData,
   onSectionEdit,
   onError
@@ -55,9 +57,9 @@ export function useSectionEdit({
     try {
       setError(null);
 
-      // Get session ID
-      const sessionData = SessionStorageService.getCurrentSession();
-      if (!sessionData?.sessionId) {
+      // Check session ID (use passed sessionId or fallback to storage)
+      const currentSessionId = sessionId || SessionStorageService.getCurrentSession()?.sessionId;
+      if (!currentSessionId) {
         throw new Error('Session not found. Please refresh the page.');
       }
 
@@ -76,7 +78,7 @@ export function useSectionEdit({
         sectionName,
         section.content,
         section.suggestions,
-        sessionData.sessionId,
+        currentSessionId,
         undefined, // No additional context for now
         {
           onProgress: (status) => {

@@ -6,6 +6,7 @@ export { ProgressIndicator } from './ProgressIndicator';
 
 // Analysis Results Components
 export { AnalysisResults } from './AnalysisResults';
+export { CVAnalysisFlow } from './CVAnalysisFlow';
 export { SectionCard } from './SectionCard';
 export { ScoreDisplay } from './ScoreDisplay';
 export { OverallScoreDisplay } from './OverallScoreDisplay';
@@ -19,3 +20,4 @@ export { ChatInterfaceDemo } from './ChatInterfaceDemo';
 // PDF Display Components
 export { default as CVCanvas } from './CVCanvas';
 export { CVCanvasDemo } from './CVCanvasDemo';
+export { default as CVStructuredView } from './CVStructuredView';

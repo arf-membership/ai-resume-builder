@@ -11,7 +11,8 @@ interface LandingPageProps {
   onAnalyzeCV?: (fileData: { resumeId: string; filePath: string }) => Promise<void>;
 }
 
-export function LandingPage({ onAnalyzeCV }: LandingPageProps) {
+export function LandingPage(props: LandingPageProps = {}) {
+  const { onAnalyzeCV } = props;
   const { sessionId } = useSession();
   const [uploadedFile, setUploadedFile] = useState<{ resumeId: string; filePath: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);

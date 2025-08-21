@@ -12,6 +12,51 @@ You must respond with a valid JSON object in the following format:
 {
   "overall_score": number (0-100),
   "summary": "Brief overall assessment",
+  "structured_content": {
+    "personal_info": {
+      "name": "Full name",
+      "title": "Professional title",
+      "contact": {
+        "email": "email@example.com",
+        "phone": "+1234567890",
+        "location": "City, Country",
+        "linkedin": "linkedin.com/in/profile",
+        "website": "website.com"
+      }
+    },
+    "professional_summary": "Professional summary content",
+    "experience": [
+      {
+        "title": "Job title",
+        "company": "Company name",
+        "location": "City, Country",
+        "duration": "Start - End",
+        "achievements": ["Achievement 1", "Achievement 2"],
+        "skills_used": ["Skill 1", "Skill 2"]
+      }
+    ],
+    "education": [
+      {
+        "degree": "Degree name",
+        "institution": "Institution name",
+        "location": "City, Country",
+        "duration": "Start - End",
+        "details": ["Detail 1", "Detail 2"]
+      }
+    ],
+    "skills": {
+      "technical": ["Skill 1", "Skill 2"],
+      "soft": ["Skill 1", "Skill 2"],
+      "languages": ["Language 1", "Language 2"]
+    },
+    "certifications": [
+      {
+        "name": "Certification name",
+        "issuer": "Issuing organization",
+        "date": "Date obtained"
+      }
+    ]
+  },
   "sections": [
     {
       "section_name": "Section name",
@@ -71,6 +116,30 @@ Always respond in JSON format:
   "questions": ["Question 1", "Question 2"],
   "explanation": "Brief explanation of why this information is needed",
   "requires_more_info": boolean
+}`;
+
+export const GLOBAL_CHAT_SYSTEM_PROMPT = `You are an expert CV improvement assistant with access to the user's complete CV analysis. Your role is to help users enhance their CV through conversational guidance and specific suggestions.
+
+Context: You have access to the user's structured CV content, analysis scores, and detailed feedback. Use this information to provide personalized, actionable advice.
+
+Guidelines:
+- Provide specific, actionable advice based on the CV analysis
+- Suggest concrete improvements with examples
+- Focus on high-impact changes that will improve scores
+- Reference specific sections and current content when relevant
+- Be encouraging and constructive
+- Ask clarifying questions when needed to provide better advice
+- Suggest updated content when appropriate
+
+Always respond in JSON format:
+{
+  "response": "Your helpful response to the user",
+  "cv_updates": {
+    "section_name": "updated_content",
+    "another_section": "updated_content"
+  },
+  "suggestions": ["Specific suggestion 1", "Specific suggestion 2"],
+  "next_steps": ["Next step 1", "Next step 2"]
 }`;
 
 /**
@@ -211,6 +280,62 @@ Please provide an improved version of this section incorporating the additional 
 }
 
 /**
+ * Create global chat prompt for comprehensive CV improvement
+ */
+export function createGlobalChatPrompt(
+  message: string,
+  cvAnalysis: any,
+  conversationHistory: Array<{ role: string; content: string }> = []
+): OpenAIMessage[] {
+  const messages: OpenAIMessage[] = [
+    {
+      role: 'system',
+      content: GLOBAL_CHAT_SYSTEM_PROMPT,
+    },
+    {
+      role: 'user',
+      content: `Here is my CV analysis data:
+
+Overall Score: ${cvAnalysis.overall_score}/100
+Summary: ${cvAnalysis.summary}
+
+${cvAnalysis.structured_content ? `
+Structured CV Content:
+${JSON.stringify(cvAnalysis.structured_content, null, 2)}
+` : ''}
+
+Section Analysis:
+${cvAnalysis.sections.map(section => `
+- ${section.section_name} (Score: ${section.score}/100)
+  Content: ${section.content}
+  Feedback: ${section.feedback}
+  Suggestions: ${section.suggestions}
+`).join('\n')}
+
+ATS Compatibility (Score: ${cvAnalysis.ats_compatibility.score}/100):
+${cvAnalysis.ats_compatibility.feedback}
+Suggestions: ${cvAnalysis.ats_compatibility.suggestions}
+
+User Message: ${message}
+
+Please provide helpful advice and specific suggestions for improving my CV.`,
+    },
+  ];
+
+  // Add conversation history
+  conversationHistory.forEach(msg => {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      messages.push({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      });
+    }
+  });
+
+  return messages;
+}
+
+/**
  * Validate and parse OpenAI JSON response
  */
 export function parseOpenAIResponse<T>(response: string): T {
@@ -226,8 +351,8 @@ export function parseOpenAIResponse<T>(response: string): T {
 /**
  * Extract text content from OpenAI completion response
  */
-export function extractResponseContent(response: unknown): string {
-  if (!response.choices || response.choices.length === 0) {
+export function extractResponseContent(response: any): string {
+  if (!response || !response.choices || response.choices.length === 0) {
     throw new Error('No choices in OpenAI response');
   }
 

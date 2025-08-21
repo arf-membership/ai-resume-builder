@@ -5,8 +5,8 @@ import { usePDFGeneration } from '../hooks/usePDFGeneration';
 import { pdfOptimizationService } from '../services/pdfOptimizationService';
 import { trackOperation, trackUserInteraction } from '../services/performanceMonitoringService';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+// Configure PDF.js worker with a more reliable approach
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface CVCanvasState {
   numPages: number | null;

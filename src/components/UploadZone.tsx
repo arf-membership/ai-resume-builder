@@ -196,12 +196,12 @@ export function UploadZone({
       {/* Upload Zone */}
       <div
         className={`
-          relative border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200 cursor-pointer touch-manipulation
+          relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer touch-manipulation backdrop-blur-sm
           ${isActive 
-            ? 'border-blue-400 bg-blue-50' 
+            ? 'border-purple-400 bg-purple-500/10 scale-105' 
             : isDisabled 
-              ? 'border-gray-200 bg-gray-50 cursor-not-allowed' 
-              : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+              ? 'border-white/20 bg-white/5 cursor-not-allowed opacity-50' 
+              : 'border-white/30 bg-white/5 hover:border-white/50 hover:bg-white/10'
           }
         `}
         onDragEnter={handleDragEnter}
@@ -231,63 +231,64 @@ export function UploadZone({
         />
 
         {/* Upload Icon */}
-        <div className="mb-3 sm:mb-4">
+        <div className="mb-6">
           {isUploading ? (
-            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto">
-              <div className="animate-spin rounded-full h-full w-full border-b-2 border-blue-600"></div>
+            <div className="w-20 h-20 mx-auto">
+              <div className="animate-spin rounded-full h-full w-full border-4 border-white/20 border-t-purple-400"></div>
             </div>
           ) : (
             <svg 
-              className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto ${isDisabled ? 'text-gray-300' : 'text-gray-400'}`} 
+              className="w-20 h-20 mx-auto text-white/70" 
               fill="none" 
               stroke="currentColor" 
-              viewBox="0 0 24 24"
+              viewBox="0 0 48 48"
               aria-hidden="true"
             >
               <path 
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" 
+                strokeWidth={1.5} 
+                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" 
               />
             </svg>
           )}
         </div>
 
         {/* Upload Text */}
-        <div className="space-y-1 sm:space-y-2">
-          {isUploading ? (
-            <>
-              <p className="text-responsive-base font-medium text-gray-700">Uploading your CV...</p>
-              <p className="text-responsive-sm text-gray-500">Please wait while we process your file</p>
-            </>
-          ) : (
-            <>
-              <p className={`text-responsive-base font-medium ${isDisabled ? 'text-gray-400' : 'text-gray-700'}`}>
-                {isActive ? 'Drop your PDF here' : (
-                  <>
-                    <span className="hidden sm:inline">Drag and drop your PDF CV here</span>
-                    <span className="sm:hidden">Tap to select your PDF CV</span>
-                  </>
-                )}
+        <div className="space-y-6">
+          <div className="text-center">
+            <p className="text-xl text-white font-medium mb-2">
+              {isUploading ? 'Uploading your CV...' : 'Drag and drop your PDF CV here'}
+            </p>
+            {!isUploading && (
+              <p className="text-gray-300">
+                or <span className="text-purple-300 font-medium">click to browse files</span>
               </p>
-              <p className={`text-responsive-sm ${isDisabled ? 'text-gray-300' : 'text-gray-500'}`}>
-                <span className="hidden sm:inline">or click to browse files</span>
-                <span className="sm:hidden">Browse files from your device</span>
-              </p>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         {/* File Requirements */}
         {!isUploading && (
-          <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400 space-y-1">
-            <div className="flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-1 sm:space-y-0">
-              <span>• PDF files only</span>
-              <span>• Max 10MB</span>
-              <span className="hidden sm:inline">• Secure processing</span>
-            </div>
-            <p className="sm:hidden">• Secure and private processing</p>
+          <div className="flex justify-center items-center space-x-6 text-sm text-gray-400">
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+              </svg>
+              PDF files only
+            </span>
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              Max 10MB
+            </span>
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+              Secure processing
+            </span>
           </div>
         )}
       </div>
