@@ -29,6 +29,7 @@ interface CVStore extends AppState {
   setEditingSection: (sectionName?: string) => void;
   setIsEditingSection: (isEditing: boolean) => void;
   updateSection: (sectionName: string, updatedSection: CVSection) => void;
+  updateSectionContent: (sectionName: string, content: string) => void;
   
   // Chat actions
   setChatOpen: (open: boolean) => void;
@@ -197,6 +198,57 @@ export const useCVStore = create<CVStore>()((set, get) => ({
               },
             });
           }
+        }
+      },
+
+      updateSectionContent: (sectionName: string, content: string) => {
+        console.log(`🔄 Store: Updating section "${sectionName}" with content:`, content.substring(0, 100) + '...');
+        
+        const analysisResult = get().analysisResult;
+        if (!analysisResult) {
+          console.warn('❌ Store: No analysis result found');
+          return;
+        }
+
+        // Handle comprehensive schema (original_cv_sections)
+        if ('original_cv_sections' in analysisResult) {
+          console.log('🔄 Store: Using comprehensive schema (original_cv_sections)');
+          const updatedSections = (analysisResult as any).original_cv_sections.map((section: any) =>
+            section.section_name === sectionName 
+              ? { ...section, content }
+              : section
+          );
+          
+          console.log('🔄 Store: Updated sections:', updatedSections.map((s: any) => s.section_name));
+          
+          set({
+            analysisResult: {
+              ...analysisResult,
+              original_cv_sections: updatedSections
+            } as any
+          });
+          
+          console.log('✅ Store: Section updated successfully');
+        }
+        // Handle legacy schema (sections)
+        else if ('sections' in analysisResult) {
+          console.log('🔄 Store: Using legacy schema (sections)');
+          const updatedSections = analysisResult.sections.map(section =>
+            section.section_name === sectionName 
+              ? { ...section, content }
+              : section
+          );
+          
+          set({
+            analysisResult: {
+              ...analysisResult,
+              sections: updatedSections
+            }
+          });
+          
+          console.log('✅ Store: Legacy section updated successfully');
+        } else {
+          console.warn('❌ Store: No valid schema found in analysis result');
         }
       },
       

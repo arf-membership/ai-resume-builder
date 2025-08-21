@@ -5,7 +5,7 @@ import AppProvider from './providers/AppProvider'
 import { SessionProvider } from './contexts/SessionContext'
 import { SecurityProvider } from './components/SecurityProvider'
 import { AppIntegration } from './components/AppIntegration'
-import { ChatPage } from './components/ChatPage'
+import { StreamingChatPage } from './components/StreamingChatPage'
 import { preloadCriticalComponents } from './components/LazyComponents'
 import { performanceMonitoring } from './services/performanceMonitoringService'
 import { validateEnvironment } from './config/production'
@@ -41,7 +41,7 @@ function App() {
           <Router>
             <Routes>
               <Route path="/" element={<AppIntegration />} />
-              <Route path="/chat" element={<ChatPage />} />
+                                        <Route path="/chat" element={<StreamingChatPage />} />
             </Routes>
           </Router>
         </SessionProvider>

@@ -75,6 +75,20 @@ export interface OpenAIResponsesResponse {
   };
 }
 
+export interface OpenAIChatCompletionRequest {
+  model: string;
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  max_tokens?: number;
+  response_format?: {
+    type: 'json_object';
+  };
+  stream?: boolean;
+}
+
 export interface OpenAICompletionResponse {
   id: string;
   object: string;
@@ -136,6 +150,56 @@ export class OpenAIClient {
       timeout: 60000, // 60 seconds
       ...config,
     };
+  }
+
+  /**
+   * Create a streaming chat completion
+   */
+  async createStreamingChatCompletion(
+    request: OpenAIChatCompletionRequest
+  ): Promise<ReadableStream<Uint8Array>> {
+    let lastError: Error;
+
+    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      try {
+        const response = await this.makeRequest('/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json',
+            ...(this.config.organization && {
+              'OpenAI-Organization': this.config.organization,
+            }),
+          },
+          body: JSON.stringify({
+            ...request,
+            stream: true, // Force streaming
+          }),
+          signal: AbortSignal.timeout(this.config.timeout),
+        });
+
+        if (!response.ok) {
+          await this.handleErrorResponse(response);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body for streaming');
+        }
+
+        return response.body;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        if (attempt < this.config.maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        
+        throw lastError;
+      }
+    }
+
+    throw lastError!;
   }
 
   /**

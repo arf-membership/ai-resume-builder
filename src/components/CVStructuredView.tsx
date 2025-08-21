@@ -16,6 +16,41 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
   cvHeader,
   updates = {},
 }) => {
+  const [recentlyUpdatedSections, setRecentlyUpdatedSections] = React.useState<Set<string>>(new Set());
+  const [previousSections, setPreviousSections] = React.useState<OriginalCVSection[]>([]);
+
+  // Track changes to originalSections content
+  React.useEffect(() => {
+    console.log('🎨 CVStructuredView: Original sections changed:', originalSections.length);
+    
+    if (previousSections.length > 0) {
+      const changedSections = new Set<string>();
+      
+      originalSections.forEach((currentSection) => {
+        const previousSection = previousSections.find(p => p.section_name === currentSection.section_name);
+        if (previousSection && previousSection.content !== currentSection.content) {
+          console.log(`🎨 CVStructuredView: Content changed for ${currentSection.section_name}`);
+          changedSections.add(currentSection.section_name);
+        }
+      });
+      
+      if (changedSections.size > 0) {
+        console.log('🎨 CVStructuredView: Setting highlights for:', Array.from(changedSections));
+        setRecentlyUpdatedSections(changedSections);
+        
+        // Clear highlights after 3 seconds
+        const timer = setTimeout(() => {
+          console.log('🎨 CVStructuredView: Clearing highlights');
+          setRecentlyUpdatedSections(new Set());
+        }, 3000);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+    
+    // Update previous sections for next comparison
+    setPreviousSections([...originalSections]);
+  }, [originalSections]);
 
   const getSectionScore = (sectionName: string): number | undefined => {
     const section = sections.find(s => 
@@ -28,6 +63,11 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
   const getUpdatedContent = (sectionName: string, originalContent: string): string => {
     return updates[sectionName] || originalContent;
   };
+
+  // Debug log when sections change
+  if (originalSections.length > 0) {
+    console.log('🎨 CVStructuredView: Rendering', originalSections.length, 'sections');
+  }
 
   // If we have original sections, show them even without structured content
   if (!structuredContent && (originalSections.length > 0 || cvHeader)) {
@@ -91,16 +131,28 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
             {/* CV Sections */}
             {originalSections
               .sort((a, b) => a.order - b.order)
-              .map((section, index) => (
-                <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide border-b-2 border-blue-600 pb-2">
-                    {section.section_name}
-                  </h2>
-                  <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {getUpdatedContent(section.section_name, section.content)}
+              .map((section, index) => {
+                const isRecentlyUpdated = recentlyUpdatedSections.has(section.section_name);
+                return (
+                  <div key={index} className={`border-b border-gray-200 pb-6 last:border-b-0 transition-all duration-500 ${
+                    isRecentlyUpdated ? 'bg-gradient-to-r from-blue-50 to-transparent border-l-4 border-l-blue-500 pl-4' : ''
+                  }`}>
+                    <h2 className={`text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide border-b-2 pb-2 transition-colors duration-500 ${
+                      isRecentlyUpdated ? 'border-blue-500 text-blue-800' : 'border-blue-600'
+                    }`}>
+                      {section.section_name}
+                      {isRecentlyUpdated && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full animate-pulse">
+                          ✨ Updated
+                        </span>
+                      )}
+                    </h2>
+                    <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {getUpdatedContent(section.section_name, section.content)}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             }
           </div>
         </div>

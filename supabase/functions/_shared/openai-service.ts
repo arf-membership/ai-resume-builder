@@ -298,6 +298,45 @@ export class OpenAIService {
   }
 
   /**
+   * Create a streaming chat completion for real-time CV improvement
+   */
+  async createStreamingChatCompletion(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options: {
+      model?: string;
+      temperature?: number;
+      max_tokens?: number;
+    } = {}
+  ): Promise<ReadableStream<Uint8Array>> {
+    try {
+      console.log('🔍 Starting streaming chat completion');
+      
+      const request = {
+        model: options.model || 'gpt-4o-mini',
+        messages,
+        temperature: options.temperature || 0.5,
+        max_tokens: options.max_tokens || 800,
+        response_format: { type: 'json_object' as const },
+        stream: true,
+      };
+
+      console.log('🚀 Sending streaming request to OpenAI');
+      
+      const stream = await this.client.createStreamingChatCompletion(request);
+      
+      console.log('✅ Streaming response received from OpenAI');
+      
+      return stream;
+    } catch (error) {
+      console.error('❌ OpenAI streaming chat error:', error);
+      if (error instanceof OpenAIError) {
+        throw new Error(`OpenAI API error: ${error.message}`);
+      }
+      throw new Error(`Streaming chat failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Analyze PDF file directly using OpenAI Responses API
    */
   async analyzeCVFromPDF(fileUrl: string): Promise<ComprehensiveCVAnalysisResponse> {
@@ -385,8 +424,64 @@ export class OpenAIService {
         analysis = JSON.parse(content);
       } catch (parseError) {
         console.error('❌ Failed to parse JSON response:', parseError);
-        console.error('Raw content that failed to parse:', content);
-        throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+        console.error('Content length:', content.length);
+        console.error('Content around error position:');
+        
+        // Try to show context around the error
+        const errorPos = parseError.message.match(/position (\d+)/);
+        if (errorPos) {
+          const pos = parseInt(errorPos[1]);
+          const start = Math.max(0, pos - 100);
+          const end = Math.min(content.length, pos + 100);
+          console.error('Context:', content.substring(start, end));
+          console.error('Error at position:', pos, 'Character:', content[pos]);
+        }
+        
+        // Log the full content for debugging (only first and last parts to avoid huge logs)
+        console.error('First 500 chars:', content.substring(0, 500));
+        console.error('Last 500 chars:', content.substring(Math.max(0, content.length - 500)));
+        
+        // Try to find and fix common JSON issues
+        let fixedContent = content.trim();
+        
+        // Remove markdown code blocks if present
+        if (fixedContent.startsWith('```json') || fixedContent.startsWith('```')) {
+          console.log('⚠️ Removing markdown code blocks');
+          fixedContent = fixedContent.replace(/^```json?\s*/, '').replace(/\s*```$/, '');
+        }
+        
+        // Remove any potential trailing commas
+        fixedContent = fixedContent.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Remove any non-JSON content before first {
+        const firstBrace = fixedContent.indexOf('{');
+        if (firstBrace > 0) {
+          console.log('⚠️ Removing content before first brace');
+          fixedContent = fixedContent.substring(firstBrace);
+        }
+        
+        // Remove any non-JSON content after last }
+        const lastBrace = fixedContent.lastIndexOf('}');
+        if (lastBrace >= 0 && lastBrace < fixedContent.length - 1) {
+          console.log('⚠️ Removing content after last brace');
+          fixedContent = fixedContent.substring(0, lastBrace + 1);
+        }
+        
+        // Clean up any weird characters that might break JSON
+        fixedContent = fixedContent
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+          .replace(/\r\n/g, '\n') // Normalize line endings
+          .replace(/\r/g, '\n');
+        
+        // Try parsing the fixed content
+        try {
+          console.log('🔧 Attempting to parse fixed JSON...');
+          analysis = JSON.parse(fixedContent);
+          console.log('✅ Successfully parsed fixed JSON');
+        } catch (secondError) {
+          console.error('❌ Still failed to parse after fixes:', secondError);
+          throw new Error(`Failed to parse JSON response even after fixes: ${parseError.message}`);
+        }
       }
       
       // Log the parsed analysis structure for debugging

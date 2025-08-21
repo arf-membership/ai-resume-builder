@@ -166,7 +166,6 @@ export interface ChatResponse {
 export interface GlobalChatResponse {
   response: string;
   cv_updates: Record<string, string>;
-  suggestions: string[];
 }
 
 // Validation error class
@@ -815,8 +814,7 @@ export function parseGlobalChatResponse(response: string): GlobalChatResponse {
   // Validate required fields with fallbacks
   const result: GlobalChatResponse = {
     response: typeof parsed.response === 'string' ? parsed.response.trim() : 'I understand your request. Let me help you improve your CV.',
-    cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {},
-    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((s: any) => typeof s === 'string') : []
+    cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {}
   };
 
   if (result.response.length === 0) {
