@@ -20,8 +20,6 @@ export const ChatPage: React.FC = () => {
   // Get CV data from store
   const analysisResult = useCVStore(state => state.analysisResult);
   const currentResume = useCVStore(state => state.currentResume);
-  const sectionUpdates = useCVStore(state => state.sectionUpdates);
-  const setSectionUpdate = useCVStore(state => state.setSectionUpdate);
   
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -35,10 +33,10 @@ export const ChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { editSection, isLoading: isEditLoading } = useSectionEdit({
+  const { editSection, isLoading: isEditLoading, sectionUpdates } = useSectionEdit({
     resumeId: currentResume?.id || '',
     sessionId: sessionId || undefined,
-    initialAnalysisData: analysisResult,
+    initialAnalysisData: analysisResult || {} as any,
     onSectionEdit: () => {},
     onError: (error) => {
       console.error('Section editing error:', error);
@@ -54,6 +52,7 @@ export const ChatPage: React.FC = () => {
   // Redirect if no analysis data
   useEffect(() => {
     if (!analysisResult || !currentResume) {
+      console.warn('No analysis result or resume found, redirecting to home');
       navigate('/', { replace: true });
     }
   }, [analysisResult, currentResume, navigate]);
@@ -269,12 +268,14 @@ export const ChatPage: React.FC = () => {
             <CVStructuredView
               structuredContent={analysisResult?.structured_content}
               sections={analysisResult?.sections}
-              updates={Object.fromEntries(
+              originalSections={(analysisResult as any)?.original_cv_sections || []}
+              cvHeader={(analysisResult as any)?.cv_header}
+              updates={sectionUpdates ? Object.fromEntries(
                 Array.from(sectionUpdates.entries()).map(([key, value]) => [
                   key, 
                   typeof value === 'string' ? value : value.content || ''
                 ])
-              )}
+              ) : {}}
             />
           </div>
         </div>

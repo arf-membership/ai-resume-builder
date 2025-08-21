@@ -58,6 +58,8 @@ export interface ComprehensiveCVAnalysisResponse {
     medium_priority: string[];
     low_priority: string[];
   };
+  original_cv_sections: OriginalCVSection[];
+  cv_header: CVHeader;
 }
 
 export interface DetailedCheck {
@@ -65,6 +67,23 @@ export interface DetailedCheck {
   status: "pass" | "warning" | "fail";
   message: string;
   suggestions: string[];
+}
+
+export interface OriginalCVSection {
+  section_name: string;
+  content: string;
+  order: number;
+}
+
+export interface CVHeader {
+  name: string;
+  title: string;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  website?: string | null;
 }
 
 export interface StructuredContent {
@@ -142,6 +161,12 @@ export interface ChatResponse {
   questions: string[];
   explanation: string;
   requires_more_info: boolean;
+}
+
+export interface GlobalChatResponse {
+  response: string;
+  cv_updates: Record<string, string>;
+  suggestions: string[];
 }
 
 // Validation error class
@@ -751,6 +776,54 @@ export function parseChatResponse(response: string): ChatResponse {
     explanation: parsed.explanation.trim(),
     requires_more_info: parsed.requires_more_info,
   };
+}
+
+/**
+ * Validate and parse global chat response for CV improvement
+ */
+export function parseGlobalChatResponse(response: string): GlobalChatResponse {
+  let parsed: any;
+  
+  try {
+    // Clean the response - remove markdown code blocks and extra text
+    let cleanedResponse = response.trim();
+    
+    // Check for markdown code blocks and extract JSON
+    const codeBlockMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+      cleanedResponse = codeBlockMatch[1].trim();
+    }
+    
+    // If response doesn't start with {, try to find JSON within it
+    if (!cleanedResponse.startsWith('{')) {
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanedResponse = jsonMatch[0];
+      }
+    }
+    
+    parsed = JSON.parse(cleanedResponse);
+  } catch (error) {
+    console.error('❌ Global Chat JSON parsing failed. Raw response:', response.substring(0, 500) + '...');
+    throw new ValidationError(`Invalid JSON response from OpenAI: ${error.message}`);
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new ValidationError('Response must be an object');
+  }
+
+  // Validate required fields with fallbacks
+  const result: GlobalChatResponse = {
+    response: typeof parsed.response === 'string' ? parsed.response.trim() : 'I understand your request. Let me help you improve your CV.',
+    cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {},
+    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((s: any) => typeof s === 'string') : []
+  };
+
+  if (result.response.length === 0) {
+    throw new ValidationError('response must be a non-empty string');
+  }
+
+  return result;
 }
 
 /**

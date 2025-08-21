@@ -114,7 +114,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
   return (
     <div className={`min-h-screen ${className}`}>
       {/* Hero Section with Modern Design */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         {/* Background Effects */}
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,68,68,.2)_50%,transparent_75%,transparent_100%)] bg-[length:250px_250px] animate-pulse"></div>
@@ -123,13 +123,9 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
           <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
         </div>
 
-        <div className="relative container mx-auto px-6 py-16 lg:py-24">
+        <div className="relative  container mx-auto px-6 py-10 lg:py-13">
           {/* Header */}
           <div className="text-center max-w-4xl mx-auto mb-16">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium mb-6">
-              <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-              AI-Powered Career Enhancement
-            </div>
             
             <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
               Transform Your
@@ -143,25 +139,10 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
               Land your dream job with our cutting-edge resume enhancement platform.
             </p>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">98%</div>
-                <div className="text-sm text-gray-400">ATS Pass Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">10K+</div>
-                <div className="text-sm text-gray-400">CVs Enhanced</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">30s</div>
-                <div className="text-sm text-gray-400">Analysis Time</div>
-              </div>
-            </div>
           </div>
 
           {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
+          {/* <div className="grid md:grid-cols-3 gap-8 mb-16">
             <div className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-300">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,7 +172,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
               <h3 className="text-xl font-semibold text-white mb-3">ATS Compatible</h3>
               <p className="text-gray-400 leading-relaxed">Ensure your resume passes through Applicant Tracking Systems with our optimization engine.</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Upload Section */}
           <div className="max-w-2xl mx-auto">

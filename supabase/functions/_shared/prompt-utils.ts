@@ -108,6 +108,33 @@ export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst wi
     "high_priority": ["Critical issues that must be fixed"],
     "medium_priority": ["Important improvements that should be made"],
     "low_priority": ["Nice-to-have enhancements"]
+  },
+  "original_cv_sections": [
+    {
+      "section_name": "Professional Summary",
+      "content": "Exact content from the CV section",
+      "order": 1
+    },
+    {
+      "section_name": "Work Experience", 
+      "content": "Complete work experience content from CV",
+      "order": 2
+    },
+    {
+      "section_name": "Education",
+      "content": "Complete education content from CV", 
+      "order": 3
+    }
+  ],
+  "cv_header": {
+    "name": "Exact full name from CV header",
+    "title": "Professional title from CV header",
+    "email": "email@domain.com or null",
+    "phone": "+1234567890 or null",
+    "location": "City, Country or null",
+    "linkedin": "linkedin.com/in/profile or null",
+    "github": "github.com/username or null",
+    "website": "website.com or null"
   }
 }
 
@@ -126,6 +153,14 @@ export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst wi
 🚨 **MANDATORY**: Extract the REAL name from the CV - if you see "Hasan Özdişçi", use exactly that
 🚨 **MANDATORY**: Extract ALL contact information found in the CV (email, phone, LinkedIn, etc.)
 🚨 **MANDATORY**: Convert ALL sections content into structured format, don't leave any empty
+🚨 **MANDATORY**: You MUST include "original_cv_sections" with ALL sections found in the CV in their original order
+🚨 **MANDATORY**: Each section in "original_cv_sections" must contain the EXACT content as it appears in the CV
+🚨 **MANDATORY**: Preserve the original structure, formatting, and wording of each section
+🚨 **MANDATORY**: Include ALL sections present in the CV (Professional Summary, Experience, Education, Skills, Projects, Certifications, etc.)
+🚨 **MANDATORY**: You MUST include "cv_header" with ALL fields (name, title, email, phone, location, linkedin, github, website)
+🚨 **MANDATORY**: Extract ALL contact information from the header - use exact values found or null if not present
+🚨 **MANDATORY**: Use the EXACT name and title as they appear at the top of the CV
+🚨 **MANDATORY**: For missing contact info, use null (not empty string, not "N/A" - use null)
 
 ## EXAMPLE FOR TURKISH CV:
 If CV shows "Hasan Özdişçi" and "Software Developer", your response MUST include:

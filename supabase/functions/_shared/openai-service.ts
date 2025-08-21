@@ -38,7 +38,7 @@ import {
 // JSON Schema for CV Analysis Response - New Comprehensive Format
 const CV_ANALYSIS_SCHEMA = {
   type: "object",
-  required: ["strengths", "next_steps", "detailed_checks", "overall_summary", "missing_elements", "industry_specific_tips", "improvement_recommendations", "user_informations"],
+  required: ["strengths", "next_steps", "detailed_checks", "overall_summary", "missing_elements", "industry_specific_tips", "improvement_recommendations", "user_informations", "original_cv_sections", "cv_header"],
   properties: {
     strengths: {
       type: "array",
@@ -219,6 +219,72 @@ const CV_ANALYSIS_SCHEMA = {
         medium_priority: { type: "array", items: { type: "string" }, description: "Important improvements that should be made" }
       },
       additionalProperties: false
+    },
+    original_cv_sections: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["section_name", "content", "order"],
+        properties: {
+          section_name: { type: "string", description: "Name of the CV section (e.g., 'Professional Summary', 'Work Experience', 'Education', 'Skills')" },
+          content: { type: "string", description: "Original content of the section exactly as found in the CV" },
+          order: { type: "number", description: "Order of the section in the original CV (1-based)" }
+        },
+        additionalProperties: false
+      },
+      description: "Original CV sections extracted from the uploaded document, preserving the user's content and structure"
+    },
+    cv_header: {
+      type: "object",
+      required: ["name", "title", "email", "phone", "location", "linkedin", "github", "website"],
+      properties: {
+        name: { type: "string", description: "Full name exactly as it appears in the CV" },
+        title: { type: "string", description: "Professional title/role exactly as it appears in the CV" },
+        email: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "Email address if found in CV, null otherwise" 
+        },
+        phone: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "Phone number if found in CV, null otherwise" 
+        },
+        location: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "Location/address if found in CV, null otherwise" 
+        },
+        linkedin: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "LinkedIn profile if found in CV, null otherwise" 
+        },
+        github: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "GitHub profile if found in CV, null otherwise" 
+        },
+        website: { 
+          anyOf: [
+            { type: "string" },
+            { type: "null" }
+          ],
+          description: "Personal website if found in CV, null otherwise" 
+        }
+      },
+      additionalProperties: false,
+      description: "Header information from the CV including name, title, and contact details"
     }
   },
   additionalProperties: false

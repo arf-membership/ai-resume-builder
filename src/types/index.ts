@@ -4,7 +4,19 @@
 export type {
   CVSection,
   ATSCompatibility,
-  CVAnalysisResult
+  CVAnalysisResult,
+  DetailedCheck,
+  ComprehensiveCVAnalysisResult,
+  AnalysisData,
+  PersonalInfo,
+  Experience,
+  Education,
+  Skills,
+  Certification,
+  StructuredContent,
+  GlobalChatResponse,
+  OriginalCVSection,
+  CVHeader
 } from './cv';
 
 // Database types
