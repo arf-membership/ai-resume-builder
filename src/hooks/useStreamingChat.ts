@@ -30,42 +30,42 @@ export function useStreamingChat(): StreamingChatHook {
   const analysisResult = useCVStore(state => state.analysisResult);
   const { updateSectionContent } = useCVStore();
 
-  // Function to aggressively try updating CV from streaming content
+  // Function to precisely extract CV updates from streaming content
   const tryUpdateCVFromStream = useCallback((streamingContent: string) => {
-    console.log('🔍 Trying to extract CV updates from stream:', streamingContent.substring(0, 200) + '...');
+    console.log('🔍 Trying to extract CV updates from stream (length:', streamingContent.length, ')');
     
     try {
-      // Pattern 1: Look for complete JSON with "cv_updates"
-      let jsonMatch = streamingContent.match(/\{[\s\S]*?"cv_updates"[\s\S]*?\{[\s\S]*?\}[\s\S]*?\}/);
+      // Only look for complete, well-formed JSON with cv_updates
+      const jsonMatch = streamingContent.match(/\{[\s\S]*?"cv_updates"\s*:\s*\{[\s\S]*?\}[\s\S]*?\}/);
+      
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
+          
           if (parsed.cv_updates && typeof parsed.cv_updates === 'object') {
-            console.log('🌊 Found cv_updates object:', Object.keys(parsed.cv_updates));
+            console.log('🌊 Found structured cv_updates:', Object.keys(parsed.cv_updates));
+            
+            // Validate that these look like actual CV content, not conversational text
             Object.entries(parsed.cv_updates).forEach(([sectionName, content]) => {
-              if (typeof content === 'string' && content.length > 30) {
-                console.log(`🌊 Applying streaming update for: ${sectionName}`);
+              if (typeof content === 'string' && 
+                  content.length > 50 && 
+                  !content.includes('What do you think') &&
+                  !content.includes('How about') &&
+                  !content.includes('?') &&
+                  !content.startsWith('!') &&
+                  !content.includes('like this:')) {
+                
+                console.log(`🌊 Applying validated update for: ${sectionName}`);
                 updateSectionContent(sectionName, content);
+              } else {
+                console.log(`🚫 Skipping conversational content for: ${sectionName}`);
               }
             });
+            
             return; // Success, exit early
           }
         } catch (e) { 
           console.warn('JSON parse error (likely incomplete):', e.message);
-        }
-      }
-
-      // Pattern 2: Look for individual section updates in quotes (more lenient)
-      const quotedSectionPattern = /"([^"]+)":\s*"([^"]{30,})"/g;
-      let match;
-      const foundUpdates = new Set();
-      
-      while ((match = quotedSectionPattern.exec(streamingContent)) !== null) {
-        const [, sectionName, content] = match;
-        if (content && content.length > 30 && !foundUpdates.has(sectionName)) {
-          console.log(`🌊 Found individual section update: ${sectionName} (${content.length} chars)`);
-          updateSectionContent(sectionName, content);
-          foundUpdates.add(sectionName);
         }
       }
 

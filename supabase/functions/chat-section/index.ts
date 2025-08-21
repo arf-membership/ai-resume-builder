@@ -130,40 +130,53 @@ Please provide a helpful conversational response and any specific CV section upd
                     
                     controller.enqueue(new TextEncoder().encode(`data: ${sseData}\n\n`));
 
-                    // ✨ AGGRESSIVELY DETECT AND SEND CV UPDATES
-                    if (fullResponse.length > 100) { // Only try when we have some content
+                    // ✨ PRECISE CV UPDATES DETECTION - Only look for structured JSON
+                    if (fullResponse.length > 200) { // Need more content to avoid false positives
                       
-                      // Try to send immediate updates for specific sections as they appear
-                      const sectionPatterns = [
-                        { name: 'Professional Summary', pattern: /(?:Professional Summary|PROFESSIONAL SUMMARY)[:\s]*([^}]{50,}?)(?="|\n\n|,\s*"|\})/i },
-                        { name: 'Work Experience', pattern: /(?:Work Experience|WORK EXPERIENCE|Experience)[:\s]*([^}]{50,}?)(?="|\n\n|,\s*"|\})/i },
-                        { name: 'Skills', pattern: /(?:Skills|SKILLS)[:\s]*([^}]{30,}?)(?="|\n\n|,\s*"|\})/i },
-                        { name: 'Education', pattern: /(?:Education|EDUCATION)[:\s]*([^}]{30,}?)(?="|\n\n|,\s*"|\})/i },
-                      ];
-
-                      sectionPatterns.forEach(({ name, pattern }) => {
-                        const match = fullResponse.match(pattern);
-                        if (match && match[1]) {
-                          const content = match[1].trim().replace(/^["']|["']$/g, ''); // Remove quotes
+                      // Only look for complete cv_updates JSON structure - much more precise
+                      const cvUpdatesMatch = fullResponse.match(/"cv_updates"\s*:\s*\{([^}]+(?:\}[^}]*)*)\}/);
+                      
+                      if (cvUpdatesMatch) {
+                        try {
+                          // Try to parse just the cv_updates section
+                          const cvUpdatesString = `{"cv_updates": {${cvUpdatesMatch[1]}}}`;
+                          const parsed = JSON.parse(cvUpdatesString);
                           
-                          // Only send if content is substantial and hasn't been sent before
-                          if (content.length > 30 && !lastCvUpdateSent.includes(content.substring(0, 50))) {
-                            console.log(`🌊 Detected ${name} update:`, content.substring(0, 100) + '...');
+                          if (parsed.cv_updates && typeof parsed.cv_updates === 'object') {
+                            // Check if this is different from what we already sent
+                            const currentUpdateKey = JSON.stringify(Object.keys(parsed.cv_updates).sort());
                             
-                            const immediateUpdate = {
-                              [name]: content
-                            };
-                            
-                            const streamingUpdateData = JSON.stringify({
-                              type: 'cv_update_stream',
-                              cv_updates: immediateUpdate
-                            });
-                            
-                            controller.enqueue(new TextEncoder().encode(`data: ${streamingUpdateData}\n\n`));
-                            lastCvUpdateSent += content.substring(0, 50); // Track what we've sent
+                            if (currentUpdateKey !== lastCvUpdateSent) {
+                              console.log(`🌊 Detected structured CV updates:`, Object.keys(parsed.cv_updates));
+                              
+                              // Only send updates that look like actual CV content (not conversational)
+                              const validUpdates = {};
+                              Object.entries(parsed.cv_updates).forEach(([sectionName, content]) => {
+                                if (typeof content === 'string' && 
+                                    content.length > 50 && 
+                                    !content.includes('What do you think') &&
+                                    !content.includes('How about') &&
+                                    !content.includes('?') &&
+                                    !content.startsWith('!')) {
+                                  validUpdates[sectionName] = content;
+                                }
+                              });
+                              
+                              if (Object.keys(validUpdates).length > 0) {
+                                const streamingUpdateData = JSON.stringify({
+                                  type: 'cv_update_stream',
+                                  cv_updates: validUpdates
+                                });
+                                
+                                controller.enqueue(new TextEncoder().encode(`data: ${streamingUpdateData}\n\n`));
+                                lastCvUpdateSent = currentUpdateKey; // Track what we've sent
+                              }
+                            }
                           }
+                        } catch (parseError) {
+                          // Ignore parsing errors for partial JSON
                         }
-                      });
+                      }
                     }
                   }
                 } catch (parseError) {

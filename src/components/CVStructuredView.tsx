@@ -18,6 +18,35 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
 }) => {
   const [recentlyUpdatedSections, setRecentlyUpdatedSections] = React.useState<Set<string>>(new Set());
   const [previousSections, setPreviousSections] = React.useState<OriginalCVSection[]>([]);
+  const [previousHeader, setPreviousHeader] = React.useState<CVHeader | undefined>(undefined);
+
+  // Track changes to cv_header content
+  React.useEffect(() => {
+    if (previousHeader && cvHeader) {
+      const headerChanged = JSON.stringify(previousHeader) !== JSON.stringify(cvHeader);
+      if (headerChanged) {
+        console.log('🎨 CVStructuredView: CV Header changed, highlighting contact info');
+        
+        // Clear existing highlights and add header highlight
+        setRecentlyUpdatedSections(new Set());
+        
+        setTimeout(() => {
+          setRecentlyUpdatedSections(new Set(['cv_header']));
+        }, 50);
+        
+        // Clear highlights after 3 seconds
+        const timer = setTimeout(() => {
+          console.log('🎨 CVStructuredView: Clearing header highlights');
+          setRecentlyUpdatedSections(new Set());
+        }, 3000);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+    
+    // Update previous header for next comparison
+    setPreviousHeader(cvHeader ? { ...cvHeader } : undefined);
+  }, [cvHeader]);
 
   // Track changes to originalSections content
   React.useEffect(() => {
@@ -36,7 +65,14 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
       
       if (changedSections.size > 0) {
         console.log('🎨 CVStructuredView: Setting highlights for:', Array.from(changedSections));
-        setRecentlyUpdatedSections(changedSections);
+        
+        // Clear any existing highlights immediately
+        setRecentlyUpdatedSections(new Set());
+        
+        // Set new highlights after a brief delay to ensure visual update
+        setTimeout(() => {
+          setRecentlyUpdatedSections(changedSections);
+        }, 50);
         
         // Clear highlights after 3 seconds
         const timer = setTimeout(() => {
@@ -75,12 +111,23 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
       <div className="h-full overflow-y-auto bg-white">
         <div className="max-w-4xl mx-auto p-8 bg-white shadow-lg">
           <div className="space-y-8">
-            {/* CV Header */}
-            {cvHeader && (
-              <div className="text-center border-b border-gray-200 pb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{cvHeader.name}</h1>
-                <h2 className="text-xl text-gray-600 mb-4">{cvHeader.title}</h2>
-                <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
+                    {/* CV Header */}
+        {cvHeader && (
+          <div className={`text-center border-b border-gray-200 pb-6 transition-all duration-500 ${
+            recentlyUpdatedSections.has('cv_header') ? 'bg-gradient-to-r from-blue-50 to-transparent border-l-4 border-l-blue-500 pl-4' : ''
+          }`}>
+            <div className="flex items-center justify-center mb-2">
+              <h1 className={`text-3xl font-bold text-gray-900 transition-colors duration-500 ${
+                recentlyUpdatedSections.has('cv_header') ? 'text-blue-800' : ''
+              }`}>{cvHeader.name}</h1>
+              {recentlyUpdatedSections.has('cv_header') && (
+                <span className="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full animate-pulse">
+                  ✨ Updated
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl text-gray-600 mb-4">{cvHeader.title}</h2>
+            <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-600">
                   {cvHeader.email && (
                     <a href={`mailto:${cvHeader.email}`} className="flex items-center hover:text-blue-600">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

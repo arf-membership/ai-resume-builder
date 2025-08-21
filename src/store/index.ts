@@ -210,14 +210,76 @@ export const useCVStore = create<CVStore>()((set, get) => ({
           return;
         }
 
+        // Handle special cases like contact_info that should update cv_header
+        if (sectionName.toLowerCase() === 'contact_info' || sectionName.toLowerCase() === 'contact information') {
+          console.log('🔄 Store: Updating contact info in cv_header');
+          
+          if ('cv_header' in analysisResult) {
+            // Parse the contact content to extract individual fields
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+            const updatedHeader = { ...(analysisResult as any).cv_header };
+            
+            lines.forEach(line => {
+              if (line.toLowerCase().includes('email:') || line.includes('@')) {
+                const email = line.replace(/email:\s*/i, '').trim();
+                updatedHeader.email = email;
+              } else if (line.toLowerCase().includes('phone:') || line.match(/\+?\d[\d\s-()]+/)) {
+                const phone = line.replace(/phone:\s*/i, '').trim();
+                updatedHeader.phone = phone;
+              } else if (line.toLowerCase().includes('linkedin:') || line.includes('linkedin.com')) {
+                const linkedin = line.replace(/linkedin:\s*/i, '').trim();
+                updatedHeader.linkedin = linkedin;
+              } else if (line.toLowerCase().includes('github:') || line.includes('github.com')) {
+                const github = line.replace(/github:\s*/i, '').trim();
+                updatedHeader.github = github;
+              } else if (line.toLowerCase().includes('location:') || line.toLowerCase().includes('address:')) {
+                const location = line.replace(/(location|address):\s*/i, '').trim();
+                updatedHeader.location = location;
+              }
+            });
+            
+            set({
+              analysisResult: {
+                ...analysisResult,
+                cv_header: updatedHeader
+              } as any
+            });
+            
+            console.log('✅ Store: Contact info updated in header');
+            return;
+          }
+        }
+
         // Handle comprehensive schema (original_cv_sections)
         if ('original_cv_sections' in analysisResult) {
           console.log('🔄 Store: Using comprehensive schema (original_cv_sections)');
-          const updatedSections = (analysisResult as any).original_cv_sections.map((section: any) =>
+          
+          // Try exact match first
+          let updatedSections = (analysisResult as any).original_cv_sections.map((section: any) =>
             section.section_name === sectionName 
               ? { ...section, content }
               : section
           );
+          
+          // If no exact match, try fuzzy matching for common variations
+          const foundExactMatch = updatedSections.some((section: any) => section.content === content);
+          
+          if (!foundExactMatch) {
+            console.log('🔄 Store: Trying fuzzy section name matching');
+            const normalizedTarget = sectionName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            updatedSections = (analysisResult as any).original_cv_sections.map((section: any) => {
+              const normalizedSection = section.section_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+              
+              // Check for partial matches
+              if (normalizedSection.includes(normalizedTarget) || normalizedTarget.includes(normalizedSection)) {
+                console.log(`🔄 Store: Fuzzy match: "${sectionName}" -> "${section.section_name}"`);
+                return { ...section, content };
+              }
+              
+              return section;
+            });
+          }
           
           console.log('🔄 Store: Updated sections:', updatedSections.map((s: any) => s.section_name));
           
