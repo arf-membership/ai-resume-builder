@@ -8,15 +8,16 @@ import {
   OpenAIClient, 
   OpenAIError,
   OpenAIRateLimitError,
-  OpenAITimeoutError 
+  OpenAITimeoutError,
+  OpenAIResponsesRequest 
 } from './openai-client.ts';
 import {
-  createAnalysisPrompt,
   createSectionEditPrompt,
   createChatPrompt,
   createContextualEditPrompt,
   extractResponseContent,
   OPENAI_CONFIGS,
+  CV_ANALYSIS_SYSTEM_PROMPT
 } from './prompt-utils.ts';
 import {
   parseCVAnalysisResponse,
@@ -26,6 +27,7 @@ import {
   validateScore,
   ValidationError,
   type CVAnalysisResponse,
+  type ComprehensiveCVAnalysisResponse,
   type SectionEditResponse,
   type ChatResponse,
 } from './response-parser.ts';
@@ -33,6 +35,195 @@ import {
 /**
  * OpenAI service class for CV operations
  */
+// JSON Schema for CV Analysis Response - New Comprehensive Format
+const CV_ANALYSIS_SCHEMA = {
+  type: "object",
+  required: ["strengths", "next_steps", "detailed_checks", "overall_summary", "missing_elements", "industry_specific_tips", "improvement_recommendations", "user_informations"],
+  properties: {
+    strengths: {
+      type: "array",
+      items: { type: "string" },
+      description: "List of resume strengths and positive aspects"
+    },
+    next_steps: {
+      type: "array",
+      items: { type: "string" },
+      description: "Recommended next steps for improvement"
+    },
+    detailed_checks: {
+      type: "object",
+      required: ["education", "formatting", "contact_info", "skills_section", "work_experience", "ats_compatibility", "keyword_optimization", "professional_summary"],
+      properties: {
+        education: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of education section" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for education" }
+          },
+          additionalProperties: false
+        },
+        formatting: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of overall formatting and layout" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for formatting" }
+          },
+          additionalProperties: false
+        },
+        contact_info: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of contact information completeness and format" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for contact info" }
+          },
+          additionalProperties: false
+        },
+        skills_section: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of skills section relevance and format" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for skills" }
+          },
+          additionalProperties: false
+        },
+        work_experience: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of work experience section" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for experience" }
+          },
+          additionalProperties: false
+        },
+        ats_compatibility: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of ATS system compatibility" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for ATS compatibility" }
+          },
+          additionalProperties: false
+        },
+        keyword_optimization: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of keyword usage and optimization" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for keywords" }
+          },
+          additionalProperties: false
+        },
+        professional_summary: {
+          type: "object",
+          required: ["score", "status", "message", "suggestions"],
+          properties: {
+            score: { type: "number", maximum: 100, minimum: 0, description: "Score from 0 to 100" },
+            status: { enum: ["pass", "warning", "fail"], type: "string", description: "Assessment status" },
+            message: { type: "string", description: "Assessment of professional summary effectiveness" },
+            suggestions: { type: "array", items: { type: "string" }, description: "specific improvements for summary" }
+          },
+          additionalProperties: false
+        }
+      },
+      additionalProperties: false
+    },
+    overall_summary: {
+      type: "object",
+      required: ["issues", "warnings", "total_checks", "overall_score", "passed_checks"],
+      properties: {
+        issues: { type: "number", description: "number of critical issues" },
+        warnings: { type: "number", description: "number of warnings" },
+        total_checks: { type: "number", description: "total number of checks performed" },
+        overall_score: { type: "number", maximum: 100, minimum: 0, description: "overall score from 0 to 100" },
+        passed_checks: { type: "number", description: "number of passed checks" }
+      },
+      additionalProperties: false
+    },
+    missing_elements: {
+      type: "array",
+      items: { type: "string" },
+      description: "Important elements that are missing from the resume"
+    },
+    user_informations: {
+      type: "object",
+      required: ["age", "education", "graduationDate", "university", "workHistory", "gender", "courses", "skills", "location", "gdp"],
+      properties: {
+        age: { type: ["number", "null"], minimum: 0, description: "User's age" },
+        gdp: { type: ["number", "null"], description: "GDP information (optional)" },
+        gender: { type: ["string", "null"], description: "User's gender" },
+        skills: { type: ["array", "null"], items: { type: "string" }, description: "List of user's skills" },
+        courses: { type: ["array", "null"], items: { type: "string" }, description: "List of courses taken" },
+        location: {
+          anyOf: [
+            { type: "null" },
+            {
+              type: "object",
+              required: ["city", "country"],
+              properties: {
+                city: { type: ["string", "null"], description: "City name" },
+                country: { type: ["string", "null"], description: "Country name" }
+              },
+              additionalProperties: false
+            }
+          ]
+        },
+        education: { enum: ["high school", "bachelor", "phd", null], type: ["string", "null"], description: "Education level" },
+        university: { type: ["string", "null"], description: "University name and department/profession" },
+        workHistory: {
+          anyOf: [
+            { type: "null" },
+            {
+              type: "object",
+              required: ["experienceYears", "jobCount"],
+              properties: {
+                jobCount: { type: ["number", "null"], minimum: 0, description: "Total number of jobs held" },
+                experienceYears: { type: ["number", "null"], minimum: 0, description: "Total years of work experience" }
+              },
+              additionalProperties: false
+            }
+          ]
+        },
+        graduationDate: { type: ["string", "null"], description: "Graduation date (e.g., '2020-05-15')" }
+      },
+      additionalProperties: false
+    },
+    industry_specific_tips: {
+      type: "array",
+      items: { type: "string" },
+      description: "Tips specific to the candidates industry"
+    },
+    improvement_recommendations: {
+      type: "object",
+      required: ["low_priority", "high_priority", "medium_priority"],
+      properties: {
+        low_priority: { type: "array", items: { type: "string" }, description: "Nice-to-have enhancements" },
+        high_priority: { type: "array", items: { type: "string" }, description: "Critical issues that must be fixed" },
+        medium_priority: { type: "array", items: { type: "string" }, description: "Important improvements that should be made" }
+      },
+      additionalProperties: false
+    }
+  },
+  additionalProperties: false
+};
+
 export class OpenAIService {
   private client: OpenAIClient;
 
@@ -41,7 +232,125 @@ export class OpenAIService {
   }
 
   /**
-   * Analyze CV text and return structured feedback
+   * Analyze PDF file directly using OpenAI Responses API
+   */
+  async analyzeCVFromPDF(fileUrl: string): Promise<ComprehensiveCVAnalysisResponse> {
+    try {
+      console.log('🔍 Starting OpenAI Responses API PDF analysis', { 
+        fileUrl: fileUrl.substring(0, 100) + '...' 
+      });
+
+      // Create the request for OpenAI Responses API
+      const request: OpenAIResponsesRequest = {
+        model: 'gpt-4.1',
+        instructions: CV_ANALYSIS_SYSTEM_PROMPT,
+        temperature: 0.3,
+        max_output_tokens: 4000,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_file',
+                file_url: fileUrl
+              },
+              {
+                type: 'input_text',
+                text: 'Please analyze this CV/resume file and provide detailed feedback using the format specified in the instructions.'
+              }
+            ]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'resume_analysis_response',
+            schema: CV_ANALYSIS_SCHEMA,
+            strict: true
+          }
+        }
+      };
+
+      // Make OpenAI request
+      const response = await this.client.createResponse(request);
+
+      console.log('🔍 Raw OpenAI Responses API response structure:', {
+        hasOutput: !!(response as any).output,
+        outputLength: (response as any).output?.length,
+        responseKeys: Object.keys(response),
+        fullResponse: JSON.stringify(response, null, 2).substring(0, 1000) + '...'
+      });
+
+      // Extract and parse response using the correct Responses API structure
+      let content: string | undefined;
+      const responseData = response as any;
+      
+      if (responseData?.output && responseData.output.length > 0) {
+        // Find the assistant message with text content
+        const assistantMessage = responseData.output.find((item: any) => 
+          item.type === 'message' && item.role === 'assistant'
+        );
+        
+        if (assistantMessage && assistantMessage.content && assistantMessage.content.length > 0) {
+          const textContent = assistantMessage.content?.find((content: any) => 
+            content.type === 'output_text'
+          );
+          
+          if (textContent && textContent.text) {
+            content = textContent.text;
+          }
+        }
+      }
+
+      if (!content) {
+        console.error('❌ No content found in OpenAI Responses API response');
+        console.error('Full response structure:', JSON.stringify(responseData, null, 2));
+        throw new Error('No content in OpenAI Responses API response');
+      }
+
+      console.log('🔍 OpenAI Responses API response received', { 
+        length: content.length,
+        preview: content.substring(0, 200) + '...'
+      });
+
+      // Parse the JSON response (should be structured already due to strict schema)
+      let analysis;
+      try {
+        analysis = JSON.parse(content);
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON response:', parseError);
+        console.error('Raw content that failed to parse:', content);
+        throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+      }
+      
+      // Log the parsed analysis structure for debugging
+      console.log('🔍 Parsed analysis structure:', {
+        keys: Object.keys(analysis),
+        hasDetailedChecks: !!analysis.detailed_checks,
+        hasOverallSummary: !!analysis.overall_summary,
+        hasUserInfo: !!analysis.user_informations
+      });
+      
+      // Validate the response structure
+      if (!analysis || typeof analysis !== 'object') {
+        console.error('❌ Analysis is not an object:', typeof analysis);
+        throw new Error('Invalid analysis response structure');
+      }
+
+      return analysis as ComprehensiveCVAnalysisResponse;
+
+    } catch (error) {
+      console.error('❌ OpenAI Responses API PDF analysis failed:', error);
+      
+      if (error instanceof OpenAIError) {
+        throw new Error(`OpenAI API error: ${error.message}`);
+      }
+      throw new Error(`CV PDF analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Analyze CV text and return structured feedback (legacy method)
    */
   async analyzeCVText(cvText: string): Promise<CVAnalysisResponse> {
     try {
@@ -49,7 +358,16 @@ export class OpenAIService {
       const sanitizedText = sanitizeTextInput(cvText, 50000);
 
       // Create prompt
-      const messages = createAnalysisPrompt(sanitizedText);
+      const messages = [
+        {
+          role: 'system' as const,
+          content: CV_ANALYSIS_SYSTEM_PROMPT,
+        },
+        {
+          role: 'user' as const,
+          content: `Please analyze the following CV and provide detailed feedback:\n\n${sanitizedText}`,
+        },
+      ];
 
       // Make OpenAI request
       const response = await this.client.createChatCompletion({

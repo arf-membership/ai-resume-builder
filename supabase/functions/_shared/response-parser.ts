@@ -3,13 +3,68 @@
  * This module provides type-safe parsing and validation of OpenAI responses
  */
 
-// Response type definitions
+// Response type definitions - Legacy format
 export interface CVAnalysisResponse {
   overall_score: number;
   summary: string;
   structured_content?: StructuredContent;
   sections: CVSectionResponse[];
   ats_compatibility: ATSCompatibilityResponse;
+}
+
+// New comprehensive CV analysis response format
+export interface ComprehensiveCVAnalysisResponse {
+  strengths: string[];
+  next_steps: string[];
+  detailed_checks: {
+    education: DetailedCheck;
+    formatting: DetailedCheck;
+    contact_info: DetailedCheck;
+    skills_section: DetailedCheck;
+    work_experience: DetailedCheck;
+    ats_compatibility: DetailedCheck;
+    keyword_optimization: DetailedCheck;
+    professional_summary: DetailedCheck;
+  };
+  overall_summary: {
+    issues: number;
+    warnings: number;
+    total_checks: number;
+    overall_score: number;
+    passed_checks: number;
+  };
+  missing_elements: string[];
+  user_informations: {
+    age: number | null;
+    education: "high school" | "bachelor" | "phd" | null;
+    graduationDate: string | null;
+    university: string | null;
+    workHistory: {
+      experienceYears: number | null;
+      jobCount: number | null;
+    } | null;
+    gender: string | null;
+    courses: string[] | null;
+    skills: string[] | null;
+    location: {
+      city: string | null;
+      country: string | null;
+    } | null;
+    gdp: number | null;
+  };
+  industry_specific_tips: string[];
+  improvement_recommendations: {
+    high_priority: string[];
+    medium_priority: string[];
+    low_priority: string[];
+  };
+}
+
+export interface DetailedCheck {
+  score: number;
+  status: "pass" | "warning" | "fail";
+  message: string;
+  suggestions: string[];
 }
 
 export interface StructuredContent {

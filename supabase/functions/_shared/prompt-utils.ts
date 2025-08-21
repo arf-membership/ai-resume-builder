@@ -25,66 +25,89 @@ export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst wi
 
 🚨 CRITICAL: You must respond with ONLY a valid JSON object, no markdown, no explanations, no code blocks. Start directly with { and end with }. Use this exact format:
 {
-  "overall_score": number (0-100),
-  "summary": "Personalized assessment based on their specific background and career field",
-  "structured_content": {
-    "personal_info": {
-      "name": "EXTRACT REAL NAME from CV",
-      "title": "EXTRACT REAL TITLE/ROLE from CV",
-      "contact": {
-        "email": "EXTRACT REAL EMAIL from CV",
-        "phone": "EXTRACT REAL PHONE from CV",
-        "location": "EXTRACT REAL LOCATION from CV",
-        "linkedin": "EXTRACT REAL LINKEDIN from CV",
-        "website": "EXTRACT REAL WEBSITE/PORTFOLIO from CV"
-      }
-    },
-    "professional_summary": "EXTRACT COMPLETE REAL SUMMARY TEXT from CV",
-    "experience": [
-      {
-        "title": "EXACT JOB TITLE from CV",
-        "company": "EXACT COMPANY NAME from CV",
-        "location": "EXACT LOCATION from CV",
-        "duration": "EXACT DATES from CV",
-        "achievements": ["EXACT ACHIEVEMENTS/RESPONSIBILITIES from CV"],
-        "skills_used": ["EXACT SKILLS/TECHNOLOGIES mentioned for this role"]
-      }
-    ],
-    "education": [
-      {
-        "degree": "EXACT DEGREE NAME from CV",
-        "institution": "EXACT INSTITUTION NAME from CV",
-        "location": "EXACT LOCATION from CV",
-        "duration": "EXACT DATES from CV",
-        "details": ["EXACT DETAILS like GPA, honors, coursework from CV"]
-      }
-    ],
-    "skills": {
-      "technical": ["ALL TECHNICAL SKILLS found in CV"],
-      "soft": ["ALL SOFT SKILLS found in CV"],
-      "languages": ["ALL LANGUAGES mentioned in CV"]
-    },
-    "certifications": [
-      {
-        "name": "EXACT CERTIFICATION NAME from CV",
-        "issuer": "EXACT ISSUING ORGANIZATION from CV",
-        "date": "EXACT DATE from CV"
-      }
-    ]
-  },
-  "sections": [
-    {
-      "section_name": "EXACT SECTION NAME as it appears in CV",
+  "strengths": ["List of resume strengths and positive aspects"],
+  "next_steps": ["Recommended next steps for improvement"],
+  "detailed_checks": {
+    "education": {
       "score": number (0-100),
-      "content": "COMPLETE EXTRACTED CONTENT from this section",
-      "feedback": "Specific feedback about this section's effectiveness for their field",
-      "suggestions": "Tailored improvement suggestions for their career level/field"
+      "status": "pass|warning|fail",
+      "message": "Assessment of education section",
+      "suggestions": ["specific improvements for education"]
+    },
+    "formatting": {
+      "score": number (0-100),
+      "status": "pass|warning|fail", 
+      "message": "Assessment of overall formatting and layout",
+      "suggestions": ["specific improvements for formatting"]
+    },
+    "contact_info": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of contact information completeness and format",
+      "suggestions": ["specific improvements for contact info"]
+    },
+    "skills_section": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of skills section relevance and format",
+      "suggestions": ["specific improvements for skills"]
+    },
+    "work_experience": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of work experience section",
+      "suggestions": ["specific improvements for experience"]
+    },
+    "ats_compatibility": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of ATS system compatibility",
+      "suggestions": ["specific improvements for ATS compatibility"]
+    },
+    "keyword_optimization": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of keyword usage and optimization",
+      "suggestions": ["specific improvements for keywords"]
+    },
+    "professional_summary": {
+      "score": number (0-100),
+      "status": "pass|warning|fail",
+      "message": "Assessment of professional summary effectiveness",
+      "suggestions": ["specific improvements for summary"]
     }
-  ],
-  "ats_compatibility": {
-    "score": number (0-100),
-    "feedback": "ATS assessment specific to their field and career level",
-    "suggestions": "Field-specific ATS optimization recommendations"
+  },
+  "overall_summary": {
+    "issues": number,
+    "warnings": number,
+    "total_checks": 8,
+    "overall_score": number (0-100),
+    "passed_checks": number
+  },
+  "missing_elements": ["Important elements that are missing from the resume"],
+  "user_informations": {
+    "age": number|null,
+    "education": "high school|bachelor|phd"|null,
+    "graduationDate": "YYYY-MM-DD"|null,
+    "university": "University name and department/profession"|null,
+    "workHistory": {
+      "experienceYears": number|null,
+      "jobCount": number|null
+    }|null,
+    "gender": "string"|null,
+    "courses": ["List of courses taken"]|null,
+    "skills": ["List of user's skills"]|null,
+    "location": {
+      "city": "string"|null,
+      "country": "string"|null
+    }|null,
+    "gdp": number|null
+  },
+  "industry_specific_tips": ["Tips specific to the candidates industry"],
+  "improvement_recommendations": {
+    "high_priority": ["Critical issues that must be fixed"],
+    "medium_priority": ["Important improvements that should be made"],
+    "low_priority": ["Nice-to-have enhancements"]
   }
 }
 

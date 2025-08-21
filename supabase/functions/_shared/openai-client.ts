@@ -26,6 +26,55 @@ export interface OpenAICompletionRequest {
   response_format?: { type: 'json_object' };
 }
 
+// New Responses API types
+export interface OpenAIResponsesRequest {
+  model: string;
+  instructions: string;
+  temperature?: number;
+  max_output_tokens?: number;
+  input: OpenAIResponseInput[];
+  text?: {
+    format?: {
+      type: 'json_schema';
+      name: string;
+      schema: any;
+      strict?: boolean;
+    };
+  };
+}
+
+export interface OpenAIResponseInput {
+  role: 'user';
+  content: OpenAIResponseContent[];
+}
+
+export interface OpenAIResponseContent {
+  type: 'input_file' | 'input_text';
+  file_url?: string;
+  text?: string;
+}
+
+export interface OpenAIResponsesResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  // Actual Responses API structure
+  output?: {
+    type: string;
+    role?: string;
+    content?: {
+      type: string;
+      text?: string;
+    }[];
+  }[];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
 export interface OpenAICompletionResponse {
   id: string;
   object: string;
@@ -87,6 +136,57 @@ export class OpenAIClient {
       timeout: 60000, // 60 seconds
       ...config,
     };
+  }
+
+  /**
+   * Create a response using the new Responses API (for PDF files)
+   */
+  async createResponse(
+    request: OpenAIResponsesRequest
+  ): Promise<OpenAIResponsesResponse> {
+    let lastError: Error;
+
+    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      try {
+        const response = await this.makeRequest('/responses', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json',
+            ...(this.config.organization && {
+              'OpenAI-Organization': this.config.organization,
+            }),
+          },
+          body: JSON.stringify(request),
+          signal: AbortSignal.timeout(this.config.timeout),
+        });
+
+        if (!response.ok) {
+          await this.handleErrorResponse(response);
+        }
+
+        return await response.json();
+      } catch (error) {
+        lastError = error as Error;
+        
+        // Don't retry on certain errors
+        if (
+          error instanceof OpenAIError && 
+          error.statusCode && 
+          [400, 401, 403, 404].includes(error.statusCode)
+        ) {
+          throw error;
+        }
+
+        // Wait before retry (exponential backoff)
+        if (attempt < this.config.maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw lastError!;
   }
 
   /**
@@ -160,9 +260,9 @@ export class OpenAIClient {
       errorData = { error: { message: 'Unknown error occurred' } };
     }
 
-    const message = errorData.error?.message || `HTTP ${response.status}`;
-    const type = errorData.error?.type;
-    const code = errorData.error?.code;
+    const message = (errorData as any)?.error?.message || `HTTP ${response.status}`;
+    const type = (errorData as any)?.error?.type;
+    const code = (errorData as any)?.error?.code;
 
     switch (response.status) {
       case 429:
@@ -184,7 +284,7 @@ export class OpenAIClient {
  */
 export async function createOpenAIClient(): Promise<OpenAIClient> {
   // In Edge Functions, we'll get the API key from Supabase Secrets
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = (globalThis as any).Deno?.env?.get('OPENAI_API_KEY');
   
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY not found in environment variables');

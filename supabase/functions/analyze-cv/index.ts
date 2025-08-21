@@ -40,64 +40,131 @@ interface AnalysisRequest {
 interface AnalysisResponse {
   resumeId: string;
   analysis: {
-    overall_score: number;
-    summary: string;
-    structured_content: {
-      personal_info: {
-        name: string;
-        title: string;
-        contact: {
-          email?: string;
-          phone?: string;
-          location?: string;
-          linkedin?: string;
-          website?: string;
-        };
+    strengths: string[];
+    next_steps: string[];
+    detailed_checks: {
+      education: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
       };
-      professional_summary?: string;
-      experience: Array<{
-        title: string;
-        company: string;
-        location?: string;
-        duration: string;
-        achievements: string[];
-        skills_used: string[];
-      }>;
-      education: Array<{
-        degree: string;
-        institution: string;
-        location?: string;
-        duration: string;
-        details: string[];
-      }>;
-      skills: {
-        technical: string[];
-        soft: string[];
-        languages: string[];
+      formatting: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
       };
-      certifications: Array<{
-        name: string;
-        issuer: string;
-        date: string;
-      }>;
+      contact_info: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
+      skills_section: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
+      work_experience: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
+      ats_compatibility: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
+      keyword_optimization: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
+      professional_summary: {
+        score: number;
+        status: "pass" | "warning" | "fail";
+        message: string;
+        suggestions: string[];
+      };
     };
-    sections: Array<{
-      section_name: string;
-      score: number;
-      content: string;
-      feedback: string;
-      suggestions: string;
-    }>;
-    ats_compatibility: {
-      score: number;
-      feedback: string;
-      suggestions: string;
+    overall_summary: {
+      issues: number;
+      warnings: number;
+      total_checks: number;
+      overall_score: number;
+      passed_checks: number;
+    };
+    missing_elements: string[];
+    user_informations: {
+      age: number | null;
+      education: "high school" | "bachelor" | "phd" | null;
+      graduationDate: string | null;
+      university: string | null;
+      workHistory: {
+        experienceYears: number | null;
+        jobCount: number | null;
+      } | null;
+      gender: string | null;
+      courses: string[] | null;
+      skills: string[] | null;
+      location: {
+        city: string | null;
+        country: string | null;
+      } | null;
+      gdp: number | null;
+    };
+    industry_specific_tips: string[];
+    improvement_recommendations: {
+      high_priority: string[];
+      medium_priority: string[];
+      low_priority: string[];
     };
   };
 }
 
 /**
- * Extract text from PDF using Supabase Storage
+ * Create signed URL for PDF file from Supabase Storage
+ */
+async function createSignedPDFUrl(supabaseClient: any, pdfPath: string): Promise<string> {
+  try {
+    log('info', 'Creating signed URL for PDF', { pdfPath });
+
+    // Create signed URL for the PDF file (valid for 1 hour)
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+      .from('originals')
+      .createSignedUrl(pdfPath, 3600); // 1 hour expiry
+
+    if (signedUrlError) {
+      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+    }
+
+    if (!signedUrlData?.signedUrl) {
+      throw new Error('No signed URL returned from Supabase');
+    }
+
+    log('info', 'Signed URL created successfully', { 
+      pdfPath,
+      urlLength: signedUrlData.signedUrl.length 
+    });
+
+    return signedUrlData.signedUrl;
+
+  } catch (error) {
+    log('error', 'Signed URL creation failed', { 
+      error: error.message, 
+      pdfPath 
+    });
+    throw new Error(`Signed URL creation failed: ${error.message}`);
+  }
+}
+
+/**
+ * Extract text from PDF using Supabase Storage (legacy method)
  */
 async function extractPDFText(supabaseClient: any, pdfPath: string): Promise<string> {
   try {
@@ -139,79 +206,98 @@ async function extractPDFText(supabaseClient: any, pdfPath: string): Promise<str
 }
 
 /**
- * Validate analysis result structure
+ * Validate analysis result structure for comprehensive schema
  */
 function validateAnalysisResult(analysis: any): boolean {
   if (!analysis || typeof analysis !== 'object') {
+    console.error('❌ Analysis validation failed: not an object');
     return false;
   }
 
-  // Check required fields
-  if (typeof analysis.overall_score !== 'number' || 
-      analysis.overall_score < 0 || 
-      analysis.overall_score > 100) {
-    return false;
-  }
-
-  if (!analysis.summary || typeof analysis.summary !== 'string') {
-    return false;
-  }
-
-  // Validate structured_content
-  if (!analysis.structured_content || typeof analysis.structured_content !== 'object') {
-    return false;
-  }
-
-  const sc = analysis.structured_content;
+  // Check required top-level fields
+  const requiredFields = ['strengths', 'next_steps', 'detailed_checks', 'overall_summary', 'missing_elements', 'user_informations', 'industry_specific_tips', 'improvement_recommendations'];
   
-  // Validate personal_info
-  if (!sc.personal_info || typeof sc.personal_info !== 'object' ||
-      !sc.personal_info.name || typeof sc.personal_info.name !== 'string' ||
-      !sc.personal_info.title || typeof sc.personal_info.title !== 'string' ||
-      !sc.personal_info.contact || typeof sc.personal_info.contact !== 'object') {
-    return false;
-  }
-
-  // Validate arrays in structured_content
-  if (!Array.isArray(sc.experience) || !Array.isArray(sc.education) || 
-      !Array.isArray(sc.certifications)) {
-    return false;
-  }
-
-  // Validate skills object
-  if (!sc.skills || typeof sc.skills !== 'object' ||
-      !Array.isArray(sc.skills.technical) || !Array.isArray(sc.skills.soft) ||
-      !Array.isArray(sc.skills.languages)) {
-    return false;
-  }
-
-  if (!Array.isArray(analysis.sections)) {
-    return false;
-  }
-
-  // Validate sections
-  for (const section of analysis.sections) {
-    if (!section.section_name || typeof section.section_name !== 'string' ||
-        typeof section.score !== 'number' || section.score < 0 || section.score > 100 ||
-        !section.content || typeof section.content !== 'string' ||
-        !section.feedback || typeof section.feedback !== 'string' ||
-        !section.suggestions || typeof section.suggestions !== 'string') {
+  for (const field of requiredFields) {
+    if (!(field in analysis)) {
+      console.error(`❌ Analysis validation failed: missing field '${field}'`);
       return false;
     }
   }
 
-  // Validate ATS compatibility
-  if (!analysis.ats_compatibility || 
-      typeof analysis.ats_compatibility.score !== 'number' ||
-      analysis.ats_compatibility.score < 0 || 
-      analysis.ats_compatibility.score > 100 ||
-      !analysis.ats_compatibility.feedback || 
-      typeof analysis.ats_compatibility.feedback !== 'string' ||
-      !analysis.ats_compatibility.suggestions || 
-      typeof analysis.ats_compatibility.suggestions !== 'string') {
+  // Validate strengths and next_steps are arrays
+  if (!Array.isArray(analysis.strengths) || !Array.isArray(analysis.next_steps)) {
+    console.error('❌ Analysis validation failed: strengths or next_steps not arrays');
     return false;
   }
 
+  // Validate detailed_checks
+  if (!analysis.detailed_checks || typeof analysis.detailed_checks !== 'object') {
+    console.error('❌ Analysis validation failed: detailed_checks not an object');
+    return false;
+  }
+
+  const requiredChecks = ['education', 'formatting', 'contact_info', 'skills_section', 'work_experience', 'ats_compatibility', 'keyword_optimization', 'professional_summary'];
+  
+  for (const checkName of requiredChecks) {
+    const check = analysis.detailed_checks[checkName];
+    if (!check || typeof check !== 'object') {
+      console.error(`❌ Analysis validation failed: missing check '${checkName}'`);
+      return false;
+    }
+    
+    if (typeof check.score !== 'number' || check.score < 0 || check.score > 100) {
+      console.error(`❌ Analysis validation failed: invalid score for '${checkName}'`);
+      return false;
+    }
+    
+    if (!['pass', 'warning', 'fail'].includes(check.status)) {
+      console.error(`❌ Analysis validation failed: invalid status for '${checkName}'`);
+      return false;
+    }
+    
+    if (typeof check.message !== 'string' || !Array.isArray(check.suggestions)) {
+      console.error(`❌ Analysis validation failed: invalid message/suggestions for '${checkName}'`);
+      return false;
+    }
+  }
+
+  // Validate overall_summary
+  const summary = analysis.overall_summary;
+  if (!summary || typeof summary !== 'object' ||
+      typeof summary.overall_score !== 'number' ||
+      summary.overall_score < 0 || summary.overall_score > 100 ||
+      typeof summary.total_checks !== 'number' ||
+      typeof summary.passed_checks !== 'number' ||
+      typeof summary.issues !== 'number' ||
+      typeof summary.warnings !== 'number') {
+    console.error('❌ Analysis validation failed: invalid overall_summary');
+    return false;
+  }
+
+  // Validate arrays
+  if (!Array.isArray(analysis.missing_elements) || 
+      !Array.isArray(analysis.industry_specific_tips)) {
+    console.error('❌ Analysis validation failed: missing_elements or industry_specific_tips not arrays');
+    return false;
+  }
+
+  // Validate user_informations
+  if (!analysis.user_informations || typeof analysis.user_informations !== 'object') {
+    console.error('❌ Analysis validation failed: user_informations not an object');
+    return false;
+  }
+
+  // Validate improvement_recommendations
+  const recommendations = analysis.improvement_recommendations;
+  if (!recommendations || typeof recommendations !== 'object' ||
+      !Array.isArray(recommendations.high_priority) ||
+      !Array.isArray(recommendations.medium_priority) ||
+      !Array.isArray(recommendations.low_priority)) {
+    console.error('❌ Analysis validation failed: invalid improvement_recommendations');
+    return false;
+  }
+
+  console.log('✅ Analysis validation passed');
   return true;
 }
 
@@ -249,8 +335,11 @@ async function storeAnalysisResults(
     log('info', 'Analysis results stored successfully', { 
       resumeId, 
       sessionId,
-      overallScore: analysis.overall_score,
-      sectionsCount: analysis.sections.length
+      overallScore: analysis.overall_summary.overall_score,
+      totalChecks: analysis.overall_summary.total_checks,
+      passedChecks: analysis.overall_summary.passed_checks,
+      issues: analysis.overall_summary.issues,
+      warnings: analysis.overall_summary.warnings
     });
 
   } catch (error) {
@@ -414,31 +503,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Use provided pdfPath or verified path
     const finalPdfPath = requestPdfPath || verifiedPdfPath;
 
-    // Extract text from PDF
-    const cvText = await measureExecutionTime(
-      () => extractPDFText(supabaseClient, finalPdfPath),
-      'PDF text extraction'
+    // Create signed URL for PDF file
+    const pdfSignedUrl = await measureExecutionTime(
+      () => createSignedPDFUrl(supabaseClient, finalPdfPath),
+      'PDF signed URL creation'
     );
 
-    if (!cvText || cvText.trim().length === 0) {
-      return addCorsHeaders(
-        createErrorResponse('No text could be extracted from the PDF', 400, 'extraction_error'),
-        req
-      );
-    }
-
-    // Create OpenAI service and analyze CV
+    // Create OpenAI service and analyze CV using Responses API
     const openaiService = await createOpenAIService();
     
-    log('info', 'Starting OpenAI CV analysis', { 
+    log('info', 'Starting OpenAI CV analysis with Responses API', { 
       sessionId, 
       resumeId: validatedResumeId,
-      textLength: cvText.length 
+      pdfPath: finalPdfPath,
+      hasSignedUrl: !!pdfSignedUrl
     });
 
     const analysis = await measureExecutionTime(
-      () => openaiService.analyzeCVText(cvText),
-      'OpenAI CV analysis'
+      () => openaiService.analyzeCVFromPDF(pdfSignedUrl),
+      'OpenAI CV analysis (Responses API)'
     );
 
     // Store analysis results in database
@@ -456,9 +539,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     log('info', 'CV analysis completed successfully', { 
       sessionId, 
       resumeId: validatedResumeId,
-      overallScore: analysis.overall_score,
-      sectionsCount: analysis.sections.length,
-      atsScore: analysis.ats_compatibility.score
+      overallScore: analysis.overall_summary.overall_score,
+      totalChecks: analysis.overall_summary.total_checks,
+      passedChecks: analysis.overall_summary.passed_checks,
+      issues: analysis.overall_summary.issues,
+      warnings: analysis.overall_summary.warnings
     });
 
     // Return success response with security headers
