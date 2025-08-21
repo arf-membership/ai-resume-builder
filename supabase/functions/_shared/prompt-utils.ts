@@ -6,82 +6,118 @@
 import type { OpenAIMessage } from './openai-client.ts';
 
 // CV Analysis prompt templates
-export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst with extensive experience in recruitment and applicant tracking systems (ATS). Your task is to analyze CVs and provide detailed, actionable feedback.
+export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst with extensive experience in recruitment and applicant tracking systems (ATS). Your task is to analyze REAL CVs and provide personalized, detailed feedback based on the ACTUAL content provided.
 
-You must respond with a valid JSON object in the following format:
+🚨 CRITICAL: You must extract and use ONLY the real information from the CV text provided. DO NOT use any placeholder or example data.
+
+## DYNAMIC ANALYSIS PROCESS:
+
+1. **EXTRACT REAL CONTENT**: Read the actual CV text and extract all real information
+2. **IDENTIFY ACTUAL SECTIONS**: Find all sections that exist in the CV (don't assume standard sections)
+3. **PERSONALIZED SCORING**: Score based on the specific career field and level shown in the CV
+4. **FIELD-SPECIFIC FEEDBACK**: Tailor suggestions to their apparent career goals and industry
+
+## SECTION DETECTION RULES:
+- Scan the CV for ALL sections present (Summary, Experience, Education, Skills, Projects, Certifications, etc.)
+- Use exact section names as they appear in the CV
+- If sections are implied but not explicitly named, use descriptive names
+- Don't assume sections exist if they're not in the CV
+
+🚨 CRITICAL: You must respond with ONLY a valid JSON object, no markdown, no explanations, no code blocks. Start directly with { and end with }. Use this exact format:
 {
   "overall_score": number (0-100),
-  "summary": "Brief overall assessment",
+  "summary": "Personalized assessment based on their specific background and career field",
   "structured_content": {
     "personal_info": {
-      "name": "Full name",
-      "title": "Professional title",
+      "name": "EXTRACT REAL NAME from CV",
+      "title": "EXTRACT REAL TITLE/ROLE from CV",
       "contact": {
-        "email": "email@example.com",
-        "phone": "+1234567890",
-        "location": "City, Country",
-        "linkedin": "linkedin.com/in/profile",
-        "website": "website.com"
+        "email": "EXTRACT REAL EMAIL from CV",
+        "phone": "EXTRACT REAL PHONE from CV",
+        "location": "EXTRACT REAL LOCATION from CV",
+        "linkedin": "EXTRACT REAL LINKEDIN from CV",
+        "website": "EXTRACT REAL WEBSITE/PORTFOLIO from CV"
       }
     },
-    "professional_summary": "Professional summary content",
+    "professional_summary": "EXTRACT COMPLETE REAL SUMMARY TEXT from CV",
     "experience": [
       {
-        "title": "Job title",
-        "company": "Company name",
-        "location": "City, Country",
-        "duration": "Start - End",
-        "achievements": ["Achievement 1", "Achievement 2"],
-        "skills_used": ["Skill 1", "Skill 2"]
+        "title": "EXACT JOB TITLE from CV",
+        "company": "EXACT COMPANY NAME from CV",
+        "location": "EXACT LOCATION from CV",
+        "duration": "EXACT DATES from CV",
+        "achievements": ["EXACT ACHIEVEMENTS/RESPONSIBILITIES from CV"],
+        "skills_used": ["EXACT SKILLS/TECHNOLOGIES mentioned for this role"]
       }
     ],
     "education": [
       {
-        "degree": "Degree name",
-        "institution": "Institution name",
-        "location": "City, Country",
-        "duration": "Start - End",
-        "details": ["Detail 1", "Detail 2"]
+        "degree": "EXACT DEGREE NAME from CV",
+        "institution": "EXACT INSTITUTION NAME from CV",
+        "location": "EXACT LOCATION from CV",
+        "duration": "EXACT DATES from CV",
+        "details": ["EXACT DETAILS like GPA, honors, coursework from CV"]
       }
     ],
     "skills": {
-      "technical": ["Skill 1", "Skill 2"],
-      "soft": ["Skill 1", "Skill 2"],
-      "languages": ["Language 1", "Language 2"]
+      "technical": ["ALL TECHNICAL SKILLS found in CV"],
+      "soft": ["ALL SOFT SKILLS found in CV"],
+      "languages": ["ALL LANGUAGES mentioned in CV"]
     },
     "certifications": [
       {
-        "name": "Certification name",
-        "issuer": "Issuing organization",
-        "date": "Date obtained"
+        "name": "EXACT CERTIFICATION NAME from CV",
+        "issuer": "EXACT ISSUING ORGANIZATION from CV",
+        "date": "EXACT DATE from CV"
       }
     ]
   },
   "sections": [
     {
-      "section_name": "Section name",
+      "section_name": "EXACT SECTION NAME as it appears in CV",
       "score": number (0-100),
-      "content": "Extracted content from this section",
-      "feedback": "Specific feedback about this section",
-      "suggestions": "Actionable improvement suggestions"
+      "content": "COMPLETE EXTRACTED CONTENT from this section",
+      "feedback": "Specific feedback about this section's effectiveness for their field",
+      "suggestions": "Tailored improvement suggestions for their career level/field"
     }
   ],
   "ats_compatibility": {
     "score": number (0-100),
-    "feedback": "ATS compatibility assessment",
-    "suggestions": "Specific ATS optimization recommendations"
+    "feedback": "ATS assessment specific to their field and career level",
+    "suggestions": "Field-specific ATS optimization recommendations"
   }
 }
 
-Focus on these key areas:
-- Professional summary/objective
-- Work experience and achievements
-- Skills and competencies
-- Education and certifications
-- Formatting and structure
-- ATS compatibility
-- Keyword optimization
-- Quantifiable achievements`;
+## VALIDATION CHECKLIST:
+❌ If personal_info.name is "Jane Smith", "John Doe", or similar → YOU'RE USING DUMMY DATA - EXTRACT REAL NAME
+❌ If companies are "TechStart Inc", "InnovaTech Solutions" → EXTRACT REAL COMPANY NAMES
+❌ If ANY content looks like an example → EXTRACT THE ACTUAL CONTENT FROM THE CV
+
+✅ All structured_content must reflect the REAL person's information
+✅ All section names must match what's actually in the CV  
+✅ All feedback must be personalized to their specific career path
+✅ Scoring must reflect their field and experience level
+
+## CRITICAL REQUIREMENTS:
+🚨 **MANDATORY**: You MUST include the "structured_content" field in your JSON response
+🚨 **MANDATORY**: Extract the REAL name from the CV - if you see "Hasan Özdişçi", use exactly that
+🚨 **MANDATORY**: Extract ALL contact information found in the CV (email, phone, LinkedIn, etc.)
+🚨 **MANDATORY**: Convert ALL sections content into structured format, don't leave any empty
+
+## EXAMPLE FOR TURKISH CV:
+If CV shows "Hasan Özdişçi" and "Software Developer", your response MUST include:
+"structured_content": {
+  "personal_info": {
+    "name": "Hasan Özdişçi",
+    "title": "Software Developer",
+    "contact": {
+      "email": "actual_email_from_cv",
+      "phone": "actual_phone_from_cv"
+    }
+  }
+}
+
+Remember: This analysis is for a REAL person's career development. Use their ACTUAL information to provide meaningful, personalized guidance that will help them improve their specific CV for their specific career goals.`;
 
 export const SECTION_EDIT_SYSTEM_PROMPT = `You are an expert CV writer specializing in creating compelling, ATS-optimized content. Your task is to improve specific CV sections based on feedback and suggestions.
 
@@ -93,7 +129,7 @@ Guidelines:
 - Keep content concise but comprehensive
 - Use industry-standard terminology
 
-Respond with a JSON object containing:
+🚨 CRITICAL: Respond with ONLY a valid JSON object, no markdown, no explanations. Use this exact format:
 {
   "improved_content": "The enhanced section content",
   "score": number (0-100),
@@ -111,7 +147,7 @@ Guidelines:
 - Keep questions conversational and easy to understand
 - Limit to 2-3 questions per response
 
-Always respond in JSON format:
+🚨 CRITICAL: Respond with ONLY a valid JSON object, no markdown, no explanations. Use this exact format:
 {
   "questions": ["Question 1", "Question 2"],
   "explanation": "Brief explanation of why this information is needed",
@@ -131,7 +167,7 @@ Guidelines:
 - Ask clarifying questions when needed to provide better advice
 - Suggest updated content when appropriate
 
-Always respond in JSON format:
+🚨 CRITICAL: Respond with ONLY a valid JSON object, no markdown, no explanations. Use this exact format:
 {
   "response": "Your helpful response to the user",
   "cv_updates": {
@@ -371,19 +407,19 @@ export const OPENAI_CONFIGS = {
   CV_ANALYSIS: {
     model: 'gpt-4o-mini',
     temperature: 0.3,
-    max_tokens: 2000,
+    max_tokens: 4000, // Increased to prevent truncation
     response_format: { type: 'json_object' as const },
   },
   SECTION_EDIT: {
     model: 'gpt-4o-mini',
     temperature: 0.4,
-    max_tokens: 1000,
+    max_tokens: 1500, // Increased
     response_format: { type: 'json_object' as const },
   },
   CHAT: {
     model: 'gpt-4o-mini',
     temperature: 0.5,
-    max_tokens: 500,
+    max_tokens: 800, // Increased
     response_format: { type: 'json_object' as const },
   },
 } as const;

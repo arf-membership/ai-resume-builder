@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AnalysisResultsProps } from '../types';
 import { useSectionEdit } from '../hooks/useSectionEdit';
 
 import { useSession } from '../contexts/SessionContext';
-import CVStructuredView from './CVStructuredView';
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+
 
 /**
  * Modern Dark-themed Analysis Results component using real data from CV analysis
@@ -20,8 +17,9 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   onDownloadPDF
 }) => {
   const { sessionId } = useSession();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'experience' | 'strategy' | 'competition' | 'chat'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'experience' | 'strategy' | 'competition'>('overview');
 
   
   
@@ -41,101 +39,9 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     }
   });
 
-  // Global chat state for CV improvements
-  const [globalChatMessages, setGlobalChatMessages] = useState<ChatMessage[]>([]);
-  const [isGlobalChatLoading, setIsGlobalChatLoading] = useState(false);
 
-  // Handle global chat message
-  const handleGlobalChatMessage = async (message: string) => {
-    if (!message.trim() || isGlobalChatLoading) return;
 
-    // Add user message
-    setGlobalChatMessages(prev => [...prev, { role: 'user', content: message }]);
-    setIsGlobalChatLoading(true);
 
-    try {
-      // Call the chat-section edge function for global CV improvement
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-section`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          resumeId,
-          sessionId: sessionId || undefined,
-          message,
-          conversationHistory: globalChatMessages,
-          currentCV: analysisData
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      // Add AI response
-      setGlobalChatMessages(prev => [...prev, { role: 'assistant', content: result.response }]);
-      
-      // Apply any CV updates if provided
-      if (result.cvUpdates) {
-        // TODO: Integrate with useSectionEdit hook to apply updates
-        console.log('CV Updates received:', result.cvUpdates);
-      }
-
-      // Handle suggestions and next steps if provided
-      if (result.suggestions && result.suggestions.length > 0) {
-        console.log('AI Suggestions:', result.suggestions);
-      }
-      if (result.nextSteps && result.nextSteps.length > 0) {
-        console.log('Next Steps:', result.nextSteps);
-      }
-    } catch (error) {
-      console.error('Global chat error:', error);
-      setGlobalChatMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
-      }]);
-    } finally {
-      setIsGlobalChatLoading(false);
-    }
-  };
-
-  // Global Chat Input Component
-  const GlobalChatInput = ({ onSendMessage, isLoading }: { onSendMessage: (message: string) => void; isLoading: boolean }) => {
-    const [inputValue, setInputValue] = useState('');
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!inputValue.trim() || isLoading) return;
-      onSendMessage(inputValue);
-      setInputValue('');
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="flex space-x-3">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Ask me how to improve your CV..."
-          disabled={isLoading}
-          className="flex-1 bg-gray-700 text-white placeholder-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !inputValue.trim()}
-          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
-      </form>
-    );
-  };
 
   // Calculate match scores from real analysis data
   const calculateMatchScores = () => {
@@ -323,7 +229,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           </div>
         );
       case 'strategy':
-        return (
+  return (
           <div className="space-y-8">
             {/* Section Analysis */}
             <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-700 p-8 shadow-lg">
@@ -348,19 +254,19 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             {section.feedback?.substring(0, 120)}...
                           </p>
                         </div>
-                      </div>
+            </div>
                       <div className="flex space-x-3">
-                        <button
-                          onClick={() => setActiveTab('chat')}
-                          className="px-4 py-2 text-sm bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 rounded-lg hover:from-purple-500/30 hover:to-blue-500/30 transition-colors border border-purple-500/30"
-                        >
-                          <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                          Go to Chat
-                        </button>
-                      </div>
-                    </div>
+              <button
+                          onClick={() => navigate('/chat')}
+                          className="group px-4 py-2 text-sm bg-gradient-to-r from-emerald-500/20 to-purple-500/20 text-emerald-300 rounded-lg hover:from-emerald-500/30 hover:to-purple-500/30 transition-all duration-300 border border-emerald-500/30 transform hover:scale-105"
+              >
+                          <svg className="w-4 h-4 mr-2 inline transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                          ✨ Enhance CV
+              </button>
+            </div>
+          </div>
                   </div>
                 ))}
               </div>
@@ -368,7 +274,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           </div>
         );
       case 'competition':
-  return (
+        return (
           <div className="space-y-8">
             {/* Strengths and Quick Wins */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -394,8 +300,8 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                   )) || (
                     <p className="text-gray-400 italic">Complete your CV analysis to see your strengths</p>
                   )}
-                </div>
-              </div>
+        </div>
+      </div>
 
               {/* Quick Wins */}
               <div className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 backdrop-blur-sm rounded-2xl border border-blue-500/30 p-8">
@@ -423,75 +329,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
             </div>
           </div>
         );
-      case 'chat':
-        return (
-          <div className="space-y-8">
-            {/* Global Chat Interface */}
-            <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-700 shadow-lg overflow-hidden">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-2xl font-bold text-white mb-2">AI CV Enhancement Chat</h2>
-                <p className="text-gray-300">Chat with AI to improve your entire CV. Changes will be reflected in real-time.</p>
-              </div>
-              
-              {/* Chat Messages Area */}
-              <div className="h-96 overflow-y-auto p-6 space-y-4">
-                {globalChatMessages.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-white font-medium mb-2">Start Your CV Enhancement</h3>
-                    <p className="text-gray-400 text-sm mb-4">
-                      Ask me anything about improving your CV. I can help with content, formatting, keywords, and more!
-                    </p>
-                    <div className="space-y-2 text-xs text-gray-500">
-                      <p>💡 "How can I improve my work experience section?"</p>
-                      <p>🎯 "What keywords should I add for tech roles?"</p>
-                      <p>✨ "Make my summary more compelling"</p>
-                    </div>
-                  </div>
-                ) : (
-                  globalChatMessages.map((message, index) => (
-                    <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.role === 'user' 
-                          ? 'bg-purple-600 text-white' 
-                          : 'bg-gray-700 text-gray-100'
-                      }`}>
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-                
-                {isGlobalChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-700 text-gray-100 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                        </div>
-                        <span className="text-sm text-gray-400">AI is thinking...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Chat Input */}
-              <div className="p-6 border-t border-gray-700">
-                <GlobalChatInput 
-                  onSendMessage={handleGlobalChatMessage}
-                  isLoading={isGlobalChatLoading}
-                />
-              </div>
-            </div>
-          </div>
-        );
+
       default:
         return null;
     }
@@ -517,18 +355,18 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">CV Analysis Results</h1>
                 <p className="text-gray-300">Comprehensive analysis of your resume with actionable insights</p>
-              </div>
-              <button
+                  </div>
+                  <button
                 onClick={onDownloadPDF}
                 className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl shadow-purple-500/25"
-              >
+                  >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                    </svg>
                 Download Enhanced PDF
-              </button>
-          </div>
-        </div>
+                  </button>
+                </div>
+              </div>
       </div>
 
         <div className="max-w-7xl mx-auto p-6">
@@ -559,49 +397,27 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               label="Strengths & Quick Wins" 
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
             />
-            <TabButton 
-              tabKey="chat"
-              label="AI Chat" 
-              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>}
-            />
+            <button
+              onClick={() => navigate('/chat')}
+              className="group relative px-8 py-4 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-600 text-white rounded-xl hover:from-emerald-600 hover:via-blue-600 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-purple-500/50 transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 hover:shadow-2xl animate-pulse-glow"
+            >
+              <div className="relative">
+                <svg className="w-6 h-6 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="font-bold text-lg">✨ Enhance My CV</span>
+                <span className="text-sm opacity-90">AI-powered improvements</span>
+              </div>
+              <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </button>
           </div>
 
-                    {/* Dynamic Layout based on active tab */}
-          {activeTab === 'chat' ? (
-            /* Chat Tab - Split Layout with Chat and CV Canvas */
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[600px]">
-              {/* Left Side - Chat */}
-              <div className="space-y-8">
-                {renderTabContent()}
-              </div>
-              
-              {/* Right Side - CV Canvas */}
-              <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-700 shadow-lg">
-                <div className="p-6 border-b border-gray-700">
-                  <h3 className="text-lg font-semibold text-white mb-1">Live CV Preview</h3>
-                  <p className="text-sm text-gray-400">See changes in real-time as you chat</p>
-                </div>
-                <div className="h-[calc(600px-80px)]">
-                  <CVStructuredView
-                    structuredContent={analysisData?.structured_content}
-                    sections={analysisData?.sections}
-                    updates={Object.fromEntries(
-                      Array.from(sectionUpdates.entries()).map(([key, value]) => [
-                        key, 
-                        typeof value === 'string' ? value : value.content || ''
-                      ])
-                    )}
-                    onSectionClick={(sectionName) => {
-                      // Optional: Highlight section or provide feedback
-                      console.log('Section clicked:', sectionName);
-                    }}
-                    highlightedSection={undefined}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Other Tabs - Standard Layout */
+                    {/* Standard Layout for all tabs */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               {/* Left Column - Analysis Content */}
               <div className="xl:col-span-2 space-y-8">
@@ -623,13 +439,13 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                         <div className="space-y-3">
                           {/* View Structured CV */}
                           <button
-                            onClick={() => setActiveTab('chat')}
-                            className="flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            onClick={() => navigate('/chat')}
+                            className="group flex items-center justify-center w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-blue-600 text-white rounded-lg hover:from-emerald-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                           >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            <svg className="w-5 h-5 mr-2 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            View Structured CV
+                            ✨ Enhance CV
                           </button>
                           
                           {/* Download Enhanced PDF */}
@@ -642,8 +458,8 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             </svg>
                             Download Enhanced PDF
                           </button>
-                        </div>
-                      </div>
+            </div>
+          </div>
 
                       {/* Section Updates Preview */}
                       {sectionUpdates.size > 0 && (
@@ -687,30 +503,30 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                               <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                              </svg>
+                </svg>
                             </div>
-                            <h4 className="text-white font-medium mb-2">Try the AI Chat!</h4>
+                            <h4 className="text-white font-medium mb-2">Need CV Improvements?</h4>
                             <p className="text-gray-400 text-sm mb-4">
-                              Go to the Chat tab to start improving your CV with AI assistance.
+                              Use our AI Chat to get personalized suggestions and real-time CV enhancements.
                             </p>
                             <button
-                              onClick={() => setActiveTab('chat')}
-                              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors"
+                              onClick={() => navigate('/chat')}
+                              className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-purple-600 text-white rounded-lg text-sm hover:from-emerald-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
                             >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              <svg className="w-4 h-4 mr-2 transform group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                               </svg>
-                              Start Chat
+                              ✨ Enhance My CV
                             </button>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                    </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
+        </div>
       </div>
 
         {/* Error Display */}
@@ -734,10 +550,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               </button>
             </div>
           </div>
-        )}
-
-        
-      </div>
+      )}
     </div>
   );
 };

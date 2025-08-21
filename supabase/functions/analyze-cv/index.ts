@@ -42,6 +42,45 @@ interface AnalysisResponse {
   analysis: {
     overall_score: number;
     summary: string;
+    structured_content: {
+      personal_info: {
+        name: string;
+        title: string;
+        contact: {
+          email?: string;
+          phone?: string;
+          location?: string;
+          linkedin?: string;
+          website?: string;
+        };
+      };
+      professional_summary?: string;
+      experience: Array<{
+        title: string;
+        company: string;
+        location?: string;
+        duration: string;
+        achievements: string[];
+        skills_used: string[];
+      }>;
+      education: Array<{
+        degree: string;
+        institution: string;
+        location?: string;
+        duration: string;
+        details: string[];
+      }>;
+      skills: {
+        technical: string[];
+        soft: string[];
+        languages: string[];
+      };
+      certifications: Array<{
+        name: string;
+        issuer: string;
+        date: string;
+      }>;
+    };
     sections: Array<{
       section_name: string;
       score: number;
@@ -115,6 +154,34 @@ function validateAnalysisResult(analysis: any): boolean {
   }
 
   if (!analysis.summary || typeof analysis.summary !== 'string') {
+    return false;
+  }
+
+  // Validate structured_content
+  if (!analysis.structured_content || typeof analysis.structured_content !== 'object') {
+    return false;
+  }
+
+  const sc = analysis.structured_content;
+  
+  // Validate personal_info
+  if (!sc.personal_info || typeof sc.personal_info !== 'object' ||
+      !sc.personal_info.name || typeof sc.personal_info.name !== 'string' ||
+      !sc.personal_info.title || typeof sc.personal_info.title !== 'string' ||
+      !sc.personal_info.contact || typeof sc.personal_info.contact !== 'object') {
+    return false;
+  }
+
+  // Validate arrays in structured_content
+  if (!Array.isArray(sc.experience) || !Array.isArray(sc.education) || 
+      !Array.isArray(sc.certifications)) {
+    return false;
+  }
+
+  // Validate skills object
+  if (!sc.skills || typeof sc.skills !== 'object' ||
+      !Array.isArray(sc.skills.technical) || !Array.isArray(sc.skills.soft) ||
+      !Array.isArray(sc.skills.languages)) {
     return false;
   }
 

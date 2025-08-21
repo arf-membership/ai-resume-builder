@@ -24,6 +24,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-pdf": "^10.0.1",
+    "react-router-dom": "^7.1.1",
     "supabase": "^2.34.3",
     "zustand": "^5.0.7"
   },

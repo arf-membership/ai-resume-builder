@@ -1,9 +1,11 @@
 import './App.css'
 import { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import AppProvider from './providers/AppProvider'
 import { SessionProvider } from './contexts/SessionContext'
 import { SecurityProvider } from './components/SecurityProvider'
 import { AppIntegration } from './components/AppIntegration'
+import { ChatPage } from './components/ChatPage'
 import { preloadCriticalComponents } from './components/LazyComponents'
 import { performanceMonitoring } from './services/performanceMonitoringService'
 import { validateEnvironment } from './config/production'
@@ -36,7 +38,12 @@ function App() {
     <AppProvider>
       <SecurityProvider enableSecurity={true}>
         <SessionProvider>
-          <AppIntegration />
+          <Router>
+            <Routes>
+              <Route path="/" element={<AppIntegration />} />
+              <Route path="/chat" element={<ChatPage />} />
+            </Routes>
+          </Router>
         </SessionProvider>
       </SecurityProvider>
     </AppProvider>

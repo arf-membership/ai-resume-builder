@@ -59,6 +59,11 @@ export class OpenAIService {
 
       // Extract and parse response
       const content = extractResponseContent(response);
+      
+      // Log raw response for debugging
+      console.log('🔍 Raw OpenAI response length:', content.length);
+      console.log('🔍 Raw OpenAI response preview:', content.substring(0, 200) + '...');
+      
       return parseCVAnalysisResponse(content);
 
     } catch (error) {
