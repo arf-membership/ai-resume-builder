@@ -30,6 +30,7 @@ interface CVStore extends AppState {
   setIsEditingSection: (isEditing: boolean) => void;
   updateSection: (sectionName: string, updatedSection: CVSection) => void;
   updateSectionContent: (sectionName: string, content: string) => void;
+  renameSections: (sectionRenames: Record<string, string>) => void;
   
   // Chat actions
   setChatOpen: (open: boolean) => void;
@@ -417,6 +418,57 @@ export const useCVStore = create<CVStore>()((set, get) => ({
         } else {
           console.warn('❌ Store: No valid schema found in analysis result');
         }
+      },
+
+      // Rename CV sections
+      renameSections: (sectionRenames: Record<string, string>) => {
+        const { analysisResult } = get();
+        if (!analysisResult) {
+          console.warn('❌ Store: No analysis result available for section renaming');
+          return;
+        }
+
+        console.log('🔄 Store: Renaming sections:', sectionRenames);
+
+        // Handle new schema (original_cv_sections)
+        if ('original_cv_sections' in analysisResult && Array.isArray(analysisResult.original_cv_sections)) {
+          const updatedSections = analysisResult.original_cv_sections.map(section => {
+            const newName = sectionRenames[section.section_name];
+            return newName 
+              ? { ...section, section_name: newName }
+              : section;
+          });
+          
+          set({
+            analysisResult: {
+              ...analysisResult,
+              original_cv_sections: updatedSections
+            } as any
+          });
+          
+          console.log('✅ Store: Sections renamed successfully');
+        }
+        // Handle legacy schema (sections)
+        else if ('sections' in analysisResult) {
+          const updatedSections = analysisResult.sections.map(section => {
+            const newName = sectionRenames[section.section_name];
+            return newName 
+              ? { ...section, section_name: newName }
+              : section;
+          });
+          
+          set({
+            analysisResult: {
+              ...analysisResult,
+              sections: updatedSections
+            }
+          });
+          
+          console.log('✅ Store: Legacy sections renamed successfully');
+        }
+        
+        // Trigger a state change to notify components of the update
+        set(state => ({ ...state, lastUpdateTimestamp: Date.now() }));
       },
       
       // Chat actions

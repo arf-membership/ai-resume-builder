@@ -112,6 +112,9 @@ Use this exact format:
   "cv_updates": {
     "Professional Summary": "Results-driven Software Developer with 1+ years of hands-on experience in designing, developing, and maintaining robust applications..."
   },
+  "section_renames": {
+    "COURSEWORK/SKILLS": "TECHNICAL SKILLS"
+  },
   "score_improvements": {
     "professional_summary": {
       "previous_score": 65,
@@ -119,7 +122,13 @@ Use this exact format:
       "improvement": 20
     }
   }
-}`;
+}
+
+SECTION RENAMING:
+- Use "section_renames" when user wants to change section header names
+- Format: "old_section_name": "new_section_name"
+- Only include section_renames when user specifically requests to rename/change section headers
+- Examples: "rename skills to technical skills", "change experience to work history"`;
 
 /**
  * Create CV analysis prompt with extracted text

@@ -29,6 +29,7 @@ interface ChatResponse {
   success: boolean;
   response?: string;
   cv_updates?: Record<string, string>;
+  section_renames?: Record<string, string>;
   error?: string;
   details?: string;
 }
@@ -101,16 +102,18 @@ Please provide a conversational response and update the specific CV section ment
     const fullResponse = openaiResponse.choices[0]?.message?.content || '';
     console.log('✅ OpenAI response received, processing response');
     
-    // Process the complete response to extract cv_updates and score improvements
+    // Process the complete response to extract cv_updates, section_renames and score improvements
     let cvUpdates = {};
+    let sectionRenames = {};
     let scoreImprovements = {};
     let conversationalResponse = fullResponse;
     
     try {
       const parsedResponse = parseGlobalChatResponse(fullResponse);
       cvUpdates = parsedResponse.cv_updates || {};
+      sectionRenames = parsedResponse.section_renames || {};
       scoreImprovements = parsedResponse.score_improvements || {};
-      conversationalResponse = parsedResponse.conversational_response || fullResponse;
+      conversationalResponse = parsedResponse.response || fullResponse;
     } catch (parseError) {
       console.warn('⚠️ Could not parse response, using raw response');
     }
@@ -120,6 +123,7 @@ Please provide a conversational response and update the specific CV section ment
       success: true,
       response: conversationalResponse,
       cv_updates: cvUpdates,
+      section_renames: sectionRenames,
       score_improvements: scoreImprovements,
       all_sections: currentCV.original_cv_sections || currentCV.sections || [],
       updated_sections: Object.keys(cvUpdates)

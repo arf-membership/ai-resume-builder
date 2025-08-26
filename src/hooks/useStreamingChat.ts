@@ -29,7 +29,7 @@ export function useStreamingChat(): StreamingChatHook {
   const { sessionId } = useSession();
   const currentResume = useCVStore(state => state.currentResume);
   const analysisResult = useCVStore(state => state.analysisResult);
-  const { updateSectionContent } = useCVStore();
+  const { updateSectionContent, renameSections } = useCVStore();
 
 
   const sendMessage = useCallback(async (message: string) => {
@@ -46,6 +46,14 @@ export function useStreamingChat(): StreamingChatHook {
 
     setMessages(prev => [...prev, userMessage]);
     setIsStreaming(true);
+
+    // Add thinking message immediately
+    const thinkingMessage: ChatMessage = {
+      role: 'assistant',
+      content: '🤔 Thinking...',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, thinkingMessage]);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-section`, {
@@ -93,7 +101,24 @@ export function useStreamingChat(): StreamingChatHook {
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Replace the thinking message with the actual response
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // Find and replace the last thinking message
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant' && newMessages[i].content === '🤔 Thinking...') {
+            newMessages[i] = assistantMessage;
+            break;
+          }
+        }
+        return newMessages;
+      });
+
+      // Handle section renames first
+      if (data.section_renames && Object.keys(data.section_renames).length > 0) {
+        console.log('🔄 Received section renames:', data.section_renames);
+        renameSections(data.section_renames);
+      }
 
       // Handle CV updates with fake highlighting
       if (data.cv_updates && Object.keys(data.cv_updates).length > 0) {
@@ -125,7 +150,18 @@ export function useStreamingChat(): StreamingChatHook {
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev.slice(0, -1), errorMessage]);
+      // Replace the thinking message with the error message
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // Find and replace the last thinking message
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant' && newMessages[i].content === '🤔 Thinking...') {
+            newMessages[i] = errorMessage;
+            break;
+          }
+        }
+        return newMessages;
+      });
     } finally {
       console.log('🔄 Setting isStreaming to false');
       setIsStreaming(false);
