@@ -82,80 +82,87 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
     setPreviousHeader(cvHeader ? { ...cvHeader } : undefined);
   }, [cvHeader]);
 
-  // Track changes to sections content
+  // Track changes to sections content with memoized comparison
+  const sectionsHash = React.useMemo(() => 
+    JSON.stringify(originalSections.map(s => ({ name: s.section_name, content: s.content }))), 
+    [originalSections]
+  );
+  
+  const previousSectionsHash = React.useMemo(() => 
+    JSON.stringify(previousSections.map(s => ({ name: s.section_name, content: s.content }))), 
+    [previousSections]
+  );
+
   React.useEffect(() => {
-    if (previousSections.length > 0 && originalSections.length > 0) {
+    if (previousSections.length > 0 && originalSections.length > 0 && sectionsHash !== previousSectionsHash) {
       const changedSections = new Set<string>();
+      const renamedSections = new Set<string>();
       
+      // Check for content changes and section renames
       originalSections.forEach(currentSection => {
         const previousSection = previousSections.find(p => p.section_name === currentSection.section_name);
-        if (previousSection && previousSection.content !== currentSection.content) {
-          // Additional validation: make sure the change is significant (not just whitespace)
-          const currentTrimmed = currentSection.content.trim();
-          const previousTrimmed = previousSection.content.trim();
-          
-          if (currentTrimmed !== previousTrimmed) {
-            console.log(`🎨 CVStructuredView: Content significantly changed for "${currentSection.section_name}"`);
-            console.log(`🎨 Previous length: ${previousTrimmed.length}, Current length: ${currentTrimmed.length}`);
+        
+        if (previousSection) {
+          // Check for content changes
+          if (previousSection.content !== currentSection.content) {
+            const currentTrimmed = currentSection.content.trim();
+            const previousTrimmed = previousSection.content.trim();
+            
+            if (currentTrimmed !== previousTrimmed) {
+              console.log(`🎨 CVStructuredView: Content changed for "${currentSection.section_name}"`);
+              changedSections.add(currentSection.section_name);
+            }
+          }
+        } else {
+          // This might be a renamed section - check if content matches any previous section
+          const matchingPreviousSection = previousSections.find(p => p.content === currentSection.content);
+          if (matchingPreviousSection) {
+            console.log(`🎨 CVStructuredView: Section renamed from "${matchingPreviousSection.section_name}" to "${currentSection.section_name}"`);
+            renamedSections.add(currentSection.section_name);
+          } else {
+            // This is a new section
+            console.log(`🎨 CVStructuredView: New section added: "${currentSection.section_name}"`);
             changedSections.add(currentSection.section_name);
           }
         }
       });
       
-      if (changedSections.size > 0 && !isUpdating) {
-        console.log('🎨 CVStructuredView: Setting highlights ONLY for new changes:', Array.from(changedSections));
+      const allChangedSections = new Set([...changedSections, ...renamedSections]);
+      
+      if (allChangedSections.size > 0 && !isUpdating) {
+        console.log('🎨 CVStructuredView: Setting highlights for changes:', Array.from(allChangedSections));
         
-        // Set flag to prevent multiple updates
         setIsUpdating(true);
-        
-        // IMMEDIATELY clear any existing highlights to prevent accumulation
         setRecentlyUpdatedSections(new Set());
         
-        // Use a unique timeout key to ensure we can cancel previous timers
         const timeoutId = setTimeout(() => {
-          console.log('🎨 CVStructuredView: Applying highlights to:', Array.from(changedSections));
-          setRecentlyUpdatedSections(new Set(changedSections)); // Create fresh set
+          setRecentlyUpdatedSections(new Set(allChangedSections));
         }, 100);
         
-        // Clear highlights after 5 seconds OR when streaming completes
         const clearTimeoutId = setTimeout(() => {
-          console.log('🎨 CVStructuredView: Clearing highlights completely');
-          setRecentlyUpdatedSections(new Set()); // Complete reset
-          setIsUpdating(false); // Reset flag
-        }, 5000);
-        
-        // Listen for streaming completion to clear highlights immediately
-        const handleStreamingComplete = () => {
-          console.log('🎨 CVStructuredView: Streaming complete, clearing highlights');
-          clearTimeout(clearTimeoutId);
           setRecentlyUpdatedSections(new Set());
           setIsUpdating(false);
-        };
-        
-        // Add event listener for streaming completion
-        window.addEventListener('streaming-complete', handleStreamingComplete);
+        }, 3100);
         
         return () => {
           clearTimeout(timeoutId);
           clearTimeout(clearTimeoutId);
-          window.removeEventListener('streaming-complete', handleStreamingComplete);
           setIsUpdating(false);
         };
       }
     }
-  }, [originalSections, isUpdating]);
+  }, [sectionsHash, previousSectionsHash, isUpdating]);
   
-  // Update previous sections only after highlights are processed
+  // Update previous sections only when not updating to prevent infinite loops
   React.useEffect(() => {
-    if (!isUpdating) {
-      // Add a small delay to ensure the update effect is visible
+    if (!isUpdating && originalSections.length > 0 && sectionsHash !== previousSectionsHash) {
       const timer = setTimeout(() => {
         setPreviousSections(originalSections.map(section => ({ ...section })));
-      }, 100);
+      }, 200);
       
       return () => clearTimeout(timer);
     }
-  }, [originalSections, isUpdating]);
+  }, [sectionsHash, previousSectionsHash, isUpdating]);
 
   const getSectionScore = (sectionName: string): number | undefined => {
     const section = sections.find(s => 

@@ -95,12 +95,13 @@ Please provide a conversational response and update the specific CV section ment
 
     // Get AI response using regular chat completion (no streaming)
     const openaiResponse = await openaiService.createChatCompletion(messages, {
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1',
       temperature: 0.5,
     });
 
     const fullResponse = openaiResponse.choices[0]?.message?.content || '';
     console.log('✅ OpenAI response received, processing response');
+    console.log('fullResponse', fullResponse);
     
     // Process the complete response to extract cv_updates, section_renames and score improvements
     let cvUpdates = {};

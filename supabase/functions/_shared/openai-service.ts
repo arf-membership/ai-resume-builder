@@ -305,7 +305,7 @@ export class OpenAIService {
       console.log('🔍 Starting streaming chat completion');
       
       const request = {
-        model: options.model || 'gpt-4o-mini',
+        model: options.model || 'gpt-4.1',
         messages,
         temperature: options.temperature || 0.5,
         response_format: { type: 'json_object' as const },
@@ -516,7 +516,7 @@ export class OpenAIService {
       console.log('🔍 Starting chat completion with responses API');
       
       const request: OpenAIResponsesRequest = {
-        model: options.model || 'gpt-4o-mini',
+        model: options.model || 'gpt-4.1',
         instructions: messages.find(m => m.role === 'system')?.content || '',
         temperature: options.temperature || 0.5,
         input: [

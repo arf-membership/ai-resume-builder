@@ -124,11 +124,20 @@ Use this exact format:
   }
 }
 
-SECTION RENAMING:
-- Use "section_renames" when user wants to change section header names
+🚨 SECTION RENAMING RULES:
+- Use "section_renames" when user asks to rename/change section HEADERS/TITLES only
+- Keywords that indicate renaming: "rename", "change", "call it", "title it", "header", "standard section headers", "standardize", "use standard"
 - Format: "old_section_name": "new_section_name"
-- Only include section_renames when user specifically requests to rename/change section headers
-- Examples: "rename skills to technical skills", "change experience to work history"`;
+- Examples of rename requests:
+  * "rename professional experience to experience"
+  * "change skills to technical skills" 
+  * "call the experience section work history"
+  * "use standard section headers" (rename to: Experience→Work Experience, Qualifications→Skills, etc.)
+  * "standardize section headers" (apply standard naming conventions)
+- Standard section names to use: "Work Experience", "Education", "Skills", "Projects", "Certifications"
+- If user wants to rename, use ONLY section_renames, do NOT use cv_updates
+- If user wants content changes, use cv_updates
+- If user wants both rename AND content changes, use both fields`;
 
 /**
  * Create CV analysis prompt with extracted text
