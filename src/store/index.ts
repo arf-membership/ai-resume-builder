@@ -44,6 +44,9 @@ interface CVStore extends AppState {
   clearErrors: () => void;
   clearErrorsByType: (type: ErrorState['type']) => void;
   
+  // Update tracking
+  lastUpdateTimestamp?: number;
+  
   // Utility actions
   reset: () => void;
 }
@@ -249,10 +252,60 @@ export const useCVStore = create<CVStore>()((set, get) => ({
             return;
           }
         }
+        
+        // Handle Header section specially - it should update cv_header
+        if (sectionName.toLowerCase() === 'header') {
+          console.log('🔄 Store: Updating Header section in cv_header');
+          
+          if ('cv_header' in analysisResult) {
+            // Parse header content to extract name, email, phone, etc.
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+            const updatedHeader = { ...(analysisResult as any).cv_header };
+            
+            // First line is usually the name
+            if (lines[0]) {
+              updatedHeader.full_name = lines[0];
+            }
+            
+            // Parse contact info from remaining lines
+            lines.slice(1).forEach(line => {
+              if (line.includes('@')) {
+                const emailMatch = line.match(/\S+@\S+\.\S+/);
+                if (emailMatch) updatedHeader.email = emailMatch[0];
+              }
+              if (line.match(/\+?\d[\d\s\-\(\)]+/)) {
+                const phoneMatch = line.match(/\+?\d[\d\s\-\(\)]+/);
+                if (phoneMatch) updatedHeader.phone = phoneMatch[0].trim();
+              }
+            });
+            
+            set({
+              analysisResult: {
+                ...analysisResult,
+                cv_header: updatedHeader
+              } as any
+            });
+            
+            console.log('✅ Store: Header updated in cv_header');
+            return;
+          }
+        }
 
         // Handle comprehensive schema (original_cv_sections)
         if ('original_cv_sections' in analysisResult) {
           console.log('🔄 Store: Using comprehensive schema (original_cv_sections)');
+          
+          // Enhanced section name mapping
+          const sectionNameMappings: {[key: string]: string[]} = {
+            'header': ['HEADER', 'Contact Info', 'Contact Information'],
+            'professional summary': ['PROFESSIONAL SUMMARY', 'Summary', 'Profile'],
+            'work experience': ['EXPERIENCE', 'Work Experience', 'Employment'],
+            'education': ['EDUCATION', 'Academic Background'],
+            'skills': ['SKILLS', 'Technical Skills', 'Core Skills'],
+            'clients': ['CLIENTS', 'Client Experience'],
+            'interests': ['INTERESTS', 'Hobbies', 'Personal Interests'],
+            'references': ['REFERENCES']
+          };
           
           // Try exact match first
           let updatedSections = (analysisResult as any).original_cv_sections.map((section: any) =>
@@ -261,24 +314,73 @@ export const useCVStore = create<CVStore>()((set, get) => ({
               : section
           );
           
-          // If no exact match, try fuzzy matching for common variations
+          // If no exact match, try mapping-based matching
           const foundExactMatch = updatedSections.some((section: any) => section.content === content);
           
           if (!foundExactMatch) {
-            console.log('🔄 Store: Trying fuzzy section name matching');
-            const normalizedTarget = sectionName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            console.log('🔄 Store: Trying section name mapping');
+            const lowerSectionName = sectionName.toLowerCase();
             
-            updatedSections = (analysisResult as any).original_cv_sections.map((section: any) => {
-              const normalizedSection = section.section_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            // Find matching section using mappings
+            for (const [backendName, frontendNames] of Object.entries(sectionNameMappings)) {
+              if (lowerSectionName === backendName || frontendNames.some(name => name.toLowerCase() === lowerSectionName)) {
+                updatedSections = (analysisResult as any).original_cv_sections.map((section: any) => {
+                  if (frontendNames.includes(section.section_name) || section.section_name.toLowerCase() === backendName) {
+                    console.log(`🔄 Store: Mapped "${sectionName}" -> "${section.section_name}"`);
+                    return { ...section, content };
+                  }
+                  return section;
+                });
+                break;
+              }
+            }
+            
+            // Fallback to fuzzy matching if mapping didn't work
+            if (!updatedSections.some((section: any) => section.content === content)) {
+              console.log('🔄 Store: Trying fuzzy section name matching');
+              const normalizedTarget = sectionName.toLowerCase().replace(/[^a-z0-9]/g, '');
               
-              // Check for partial matches
-              if (normalizedSection.includes(normalizedTarget) || normalizedTarget.includes(normalizedSection)) {
-                console.log(`🔄 Store: Fuzzy match: "${sectionName}" -> "${section.section_name}"`);
-                return { ...section, content };
+              updatedSections = (analysisResult as any).original_cv_sections.map((section: any) => {
+                const normalizedSection = section.section_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                // Check for partial matches
+                if (normalizedSection.includes(normalizedTarget) || normalizedTarget.includes(normalizedSection)) {
+                  console.log(`🔄 Store: Fuzzy match: "${sectionName}" -> "${section.section_name}"`);
+                  return { ...section, content };
+                }
+                
+                return section;
+              });
+            }
+            
+            // If still no match found, create a new section
+            if (!updatedSections.some((section: any) => section.content === content)) {
+              console.log(`🔄 Store: Creating new section: "${sectionName}"`);
+              
+              // Determine the order for the new section
+              const maxOrder = Math.max(...updatedSections.map((s: any) => s.order || 0));
+              let newOrder = maxOrder + 1;
+              
+              // Special ordering for Professional Summary - should be after header but before other sections
+              if (sectionName.toLowerCase().includes('professional summary') || sectionName.toLowerCase().includes('summary')) {
+                // Insert after header (order 1) but before other sections
+                newOrder = 2;
+                // Shift other sections down
+                updatedSections = updatedSections.map((section: any) => ({
+                  ...section,
+                  order: section.order >= 2 ? section.order + 1 : section.order
+                }));
               }
               
-              return section;
-            });
+              const newSection = {
+                section_name: sectionName,
+                content: content,
+                order: newOrder
+              };
+              
+              updatedSections.push(newSection);
+              console.log(`✅ Store: Created new section "${sectionName}" with order ${newOrder}`);
+            }
           }
           
           console.log('🔄 Store: Updated sections:', updatedSections.map((s: any) => s.section_name));
@@ -291,6 +393,9 @@ export const useCVStore = create<CVStore>()((set, get) => ({
           });
           
           console.log('✅ Store: Section updated successfully');
+          
+          // Trigger a state change to notify components of the update
+          set(state => ({ ...state, lastUpdateTimestamp: Date.now() }));
         }
         // Handle legacy schema (sections)
         else if ('sections' in analysisResult) {

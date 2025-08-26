@@ -27,6 +27,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [currentStage, setCurrentStage] = useState('');
   const [showResults, setShowResults] = useState(false);
   
   const analysisRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
       setIsAnalyzing(true);
       setAnalysisProgress(0);
       setUploadError(null);
+      setCurrentStage('Initializing analysis...');
 
       // Set the current resume in the store
       actions.setCurrentResume({
@@ -70,27 +72,44 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
 
       actions.setIsAnalyzing(true);
 
-      // Call the analysis service
-      const result = await AnalysisService.analyzeCV(
-        uploadedFile.resumeId,
-        sessionId,
-        (progress: number) => {
-          setAnalysisProgress(progress);
-        }
-      );
-
-      // Store the analysis result
-      actions.setAnalysisResult(result);
-      setShowResults(true);
-      showSuccess('CV Analysis Complete', 'Your CV has been analyzed successfully!');
-
-      // Smooth scroll to results after a brief delay
-      setTimeout(() => {
-        analysisRef.current?.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'start'
+      // Start fake progress timer
+      const progressInterval = setInterval(() => {
+        setAnalysisProgress(prev => {
+          const newProgress = Math.min(prev + Math.random() * 3 + 1, 95); // Increment by 1-4%, max 95%
+          updateStageAndTime(newProgress);
+          return newProgress;
         });
-      }, 500);
+      }, 800); // Update every 800ms
+
+      try {
+        // Call the analysis service (this is the long AI request)
+        const result = await AnalysisService.analyzeCV(
+          uploadedFile.resumeId,
+          sessionId
+        );
+        
+        // Clear the fake progress and set to 100%
+        clearInterval(progressInterval);
+        setAnalysisProgress(100);
+        updateStageAndTime(100);
+        
+        // Store the analysis result
+        actions.setAnalysisResult(result);
+        setShowResults(true);
+        showSuccess('CV Analysis Complete', 'Your CV has been analyzed successfully!');
+
+        // Smooth scroll to results after a brief delay
+        setTimeout(() => {
+          analysisRef.current?.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }, 500);
+        
+      } catch (error) {
+        clearInterval(progressInterval);
+        throw error;
+      }
 
     } catch (error) {
       console.error('Analysis failed:', error);
@@ -99,6 +118,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
     } finally {
       setIsAnalyzing(false);
       setAnalysisProgress(0);
+      setCurrentStage('');
       actions.setIsAnalyzing(false);
     }
   };
@@ -109,6 +129,29 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
 
   const handleDownloadPDF = () => {
     console.log('Downloading PDF');
+  };
+
+  const updateStageAndTime = (progress: number) => {
+    // Update stage based on progress with more granular updates
+    if (progress < 15) {
+      setCurrentStage('📄 Extracting text from your CV...');
+    } else if (progress < 25) {
+      setCurrentStage('📋 Processing document structure...');
+    } else if (progress < 40) {
+      setCurrentStage('🔍 Analyzing CV structure and formatting...');
+    } else if (progress < 55) {
+      setCurrentStage('🤖 AI is processing your content...');
+    } else if (progress < 65) {
+      setCurrentStage('🧠 Deep content analysis in progress...');
+    } else if (progress < 75) {
+      setCurrentStage('📊 Calculating compatibility scores...');
+    } else if (progress < 90) {
+      setCurrentStage('💡 Generating personalized recommendations...');
+    } else if (progress < 100) {
+      setCurrentStage('✨ Finalizing your analysis...');
+    } else {
+      setCurrentStage('✅ Analysis complete!');
+    }
   };
 
   return (
@@ -126,6 +169,15 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
         <div className="relative  container mx-auto px-6 py-10 lg:py-13">
           {/* Header */}
           <div className="text-center max-w-4xl mx-auto mb-16">
+            <style>{`
+              @keyframes shimmer {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(200%); }
+              }
+              .animate-shimmer {
+                animation: shimmer 2s infinite;
+              }
+            `}</style>
             
             <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 tracking-tight">
               Transform Your
@@ -232,7 +284,9 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
                     {isAnalyzing ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
-                        <span>Analyzing... {Math.round(analysisProgress)}%</span>
+                        <div className="flex flex-col items-center">
+                          <span className="font-semibold">Analyzing... {Math.round(analysisProgress)}%</span>
+                        </div>
                       </>
                     ) : (
                       <>
@@ -247,47 +301,104 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
 
                   {/* Enhanced Progress Visualization */}
                   {isAnalyzing && (
-                    <div className="mt-8 space-y-4">
-                      {/* Progress Bar */}
+                    <div className="mt-8 space-y-6">
+                      {/* Current Stage Display */}
+                      <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full border border-purple-500/30 mb-4">
+                          <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <h3 className="text-white text-xl font-semibold mb-2">
+                          {currentStage || 'Processing your CV...'}
+                        </h3>
+                        <div className="flex items-center justify-center space-x-4 text-sm text-gray-300">
+                          <span className="text-purple-400 font-medium">{Math.round(analysisProgress)}% complete</span>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Progress Bar */}
                       <div className="relative">
-                        <div className="bg-white/10 rounded-full h-3 overflow-hidden backdrop-blur-sm">
+                        <div className="bg-white/10 rounded-full h-4 overflow-hidden backdrop-blur-sm border border-white/20">
                           <div 
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 transition-all duration-500 ease-out relative"
+                            className="bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 h-4 transition-all duration-700 ease-out relative"
                             style={{ width: `${analysisProgress}%` }}
                           >
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
                           </div>
                         </div>
-                        <div className="text-center mt-3">
-                          <span className="text-white font-medium">{Math.round(analysisProgress)}%</span>
+                      </div>
+
+                      {/* Progress Milestones */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                        <div className={`flex flex-col items-center p-3 rounded-lg border transition-all duration-300 ${
+                          analysisProgress >= 25 
+                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' 
+                            : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                        }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 text-sm ${
+                            analysisProgress >= 25 ? 'bg-purple-500/20' : 'bg-gray-500/20'
+                          }`}>
+                            {analysisProgress >= 25 ? '✓' : '📄'}
+                          </div>
+                          <span className="font-medium">Text Extraction</span>
+                        </div>
+                        
+                        <div className={`flex flex-col items-center p-3 rounded-lg border transition-all duration-300 ${
+                          analysisProgress >= 50 
+                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' 
+                            : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                        }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 text-sm ${
+                            analysisProgress >= 50 ? 'bg-purple-500/20' : 'bg-gray-500/20'
+                          }`}>
+                            {analysisProgress >= 50 ? '✓' : '🤖'}
+                          </div>
+                          <span className="font-medium">AI Analysis</span>
+                        </div>
+                        
+                        <div className={`flex flex-col items-center p-3 rounded-lg border transition-all duration-300 ${
+                          analysisProgress >= 85 
+                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' 
+                            : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                        }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 text-sm ${
+                            analysisProgress >= 85 ? 'bg-purple-500/20' : 'bg-gray-500/20'
+                          }`}>
+                            {analysisProgress >= 85 ? '✓' : '💡'}
+                          </div>
+                          <span className="font-medium">Recommendations</span>
+                        </div>
+                        
+                        <div className={`flex flex-col items-center p-3 rounded-lg border transition-all duration-300 ${
+                          analysisProgress >= 100 
+                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-300' 
+                            : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                        }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 text-sm ${
+                            analysisProgress >= 100 ? 'bg-purple-500/20' : 'bg-gray-500/20'
+                          }`}>
+                            {analysisProgress >= 100 ? '✓' : '✨'}
+                          </div>
+                          <span className="font-medium">Finalizing</span>
                         </div>
                       </div>
 
-                      {/* Progress Steps */}
-                      <div className="flex justify-between text-sm text-gray-300">
-                        <span className={analysisProgress >= 10 ? 'text-purple-400 font-medium' : ''}>
-                          📄 Extracting Text
-                        </span>
-                        <span className={analysisProgress >= 40 ? 'text-purple-400 font-medium' : ''}>
-                          🤖 AI Analysis
-                        </span>
-                        <span className={analysisProgress >= 70 ? 'text-purple-400 font-medium' : ''}>
-                          💡 Generating Tips
-                        </span>
-                        <span className={analysisProgress >= 95 ? 'text-purple-400 font-medium' : ''}>
-                          ✨ Finalizing
-                        </span>
-                      </div>
-
-                      {/* Dynamic Messages */}
-                      <div className="text-center">
-                        <p className="text-gray-300 text-lg font-medium">
-                          {analysisProgress < 20 && "🔍 Scanning your CV structure..."}
-                          {analysisProgress >= 20 && analysisProgress < 50 && "🧠 AI is analyzing your content..."}
-                          {analysisProgress >= 50 && analysisProgress < 80 && "💬 Generating personalized feedback..."}
-                          {analysisProgress >= 80 && analysisProgress < 95 && "📊 Calculating match scores..."}
-                          {analysisProgress >= 95 && "🎉 Almost ready!"}
-                        </p>
+                      {/* Fun Facts During Wait */}
+                      <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                            💡
+                          </div>
+                          <div>
+                            <h4 className="text-white font-medium mb-1">Did you know?</h4>
+                            <p className="text-gray-300 text-sm">
+                              {analysisProgress < 30 && "Our AI analyzes over 50 different aspects of your CV, from formatting to keyword optimization."}
+                              {analysisProgress >= 30 && analysisProgress < 60 && "75% of resumes are rejected by ATS systems before a human ever sees them. We're making sure yours isn't one of them!"}
+                              {analysisProgress >= 60 && analysisProgress < 90 && "The average recruiter spends only 6 seconds reviewing a resume. We're optimizing yours for maximum impact."}
+                              {analysisProgress >= 90 && "Your enhanced CV will be ready in just a moment. Great things are worth the wait!"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}

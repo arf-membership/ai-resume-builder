@@ -8,11 +8,6 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-interface ScoreImprovement {
-  previous_score: number;
-  new_score: number;
-  improvement: number;
-}
 
 interface StreamingChatHook {
   messages: ChatMessage[];
@@ -36,49 +31,6 @@ export function useStreamingChat(): StreamingChatHook {
   const analysisResult = useCVStore(state => state.analysisResult);
   const { updateSectionContent } = useCVStore();
 
-  // Function to precisely extract CV updates from streaming content
-  const tryUpdateCVFromStream = useCallback((streamingContent: string) => {
-    console.log('🔍 Trying to extract CV updates from stream (length:', streamingContent.length, ')');
-    
-    try {
-      // Only look for complete, well-formed JSON with cv_updates
-      const jsonMatch = streamingContent.match(/\{[\s\S]*?"cv_updates"\s*:\s*\{[\s\S]*?\}[\s\S]*?\}/);
-      
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          
-          if (parsed.cv_updates && typeof parsed.cv_updates === 'object') {
-            console.log('🌊 Found structured cv_updates:', Object.keys(parsed.cv_updates));
-            
-            // Validate that these look like actual CV content, not conversational text
-            Object.entries(parsed.cv_updates).forEach(([sectionName, content]) => {
-              if (typeof content === 'string' && 
-                  content.length > 50 && 
-                  !content.includes('What do you think') &&
-                  !content.includes('How about') &&
-                  !content.includes('?') &&
-                  !content.startsWith('!') &&
-                  !content.includes('like this:')) {
-                
-                console.log(`🌊 Applying validated update for: ${sectionName}`);
-                updateSectionContent(sectionName, content);
-              } else {
-                console.log(`🚫 Skipping conversational content for: ${sectionName}`);
-              }
-            });
-            
-            return; // Success, exit early
-          }
-        } catch (e) { 
-          console.warn('JSON parse error (likely incomplete):', e.message);
-        }
-      }
-
-    } catch (error) {
-      console.warn('Error extracting CV updates from stream:', error);
-    }
-  }, [updateSectionContent]);
 
   const sendMessage = useCallback(async (message: string) => {
     if (!currentResume || !analysisResult || !sessionId) {
@@ -86,7 +38,6 @@ export function useStreamingChat(): StreamingChatHook {
       return;
     }
 
-    // Add user message
     const userMessage: ChatMessage = {
       role: 'user',
       content: message,
@@ -118,94 +69,65 @@ export function useStreamingChat(): StreamingChatHook {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Chat request failed');
       }
 
-      let assistantContent = '';
+      // Parse the nested response if it's JSON
+      let actualResponse = data.response;
+      try {
+        const parsedResponse = JSON.parse(data.response);
+        if (parsedResponse.response) {
+          actualResponse = parsedResponse.response;
+        }
+      } catch (e) {
+        // If parsing fails, use the original response
+        actualResponse = data.response;
+      }
+
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: '',
+        content: actualResponse || "Great! I've updated that section. Here are more suggestions to continue improving your CV:",
         timestamp: new Date()
       };
 
-      // Add empty assistant message that we'll update
       setMessages(prev => [...prev, assistantMessage]);
 
-      const decoder = new TextDecoder();
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.type === 'chunk') {
-                assistantContent += data.content;
-                
-                // Show a simple static response in chat after we get enough content
-                if (assistantContent.length > 100) {
-                  setMessages(prev => prev.map((msg, index) => 
-                    index === prev.length - 1 
-                      ? { ...msg, content: "I'm updating your CV sections in real-time! Watch the right panel for changes ✨" }
-                      : msg
-                  ));
-                }
-
-                // ✨ IMMEDIATELY TRY TO UPDATE CV FROM STREAMING CONTENT
-                tryUpdateCVFromStream(assistantContent);
-                
-              } else if (data.type === 'cv_update_stream') {
-                // ✨ Handle real-time CV updates sent from backend
-                console.log('🌊 Received streaming CV updates:', data.cv_updates);
-                if (data.cv_updates && Object.keys(data.cv_updates).length > 0) {
-                  Object.entries(data.cv_updates).forEach(([sectionName, content]) => {
-                    console.log(`🔄 Streaming update for: ${sectionName}`);
-                    updateSectionContent(sectionName, content as string);
-                  });
-                }
-                
-              } else if (data.type === 'complete') {
-                console.log('✅ Streaming complete, applying final CV updates:', data.cv_updates);
-                
-                // Apply final CV updates to the store
-                if (data.cv_updates && Object.keys(data.cv_updates).length > 0) {
-                  Object.entries(data.cv_updates).forEach(([sectionName, content]) => {
-                    console.log(`🔄 Updating section: ${sectionName}`);
-                    updateSectionContent(sectionName, content as string);
-                  });
-                }
-
-                // Score improvements removed for cleaner UI
-              } else if (data.type === 'error') {
-                console.error('❌ Streaming error:', data.error);
-                throw new Error(data.error);
-              }
-            } catch (parseError) {
-              console.warn('Could not parse SSE data:', line);
-            }
-          }
-        }
+      // Handle CV updates with fake highlighting
+      if (data.cv_updates && Object.keys(data.cv_updates).length > 0) {
+        console.log('🔄 Received CV updates:', data.cv_updates);
+        
+        Object.entries(data.cv_updates).forEach(([sectionName, content]) => {
+          console.log(`🔄 Updating section: ${sectionName}`);
+          updateSectionContent(sectionName, content as string);
+        });
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('cv-sections-updated', {
+            detail: { updatedSections: data.updated_sections || Object.keys(data.cv_updates) }
+          }));
+        }, 100);
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('clear-cv-highlights'));
+        }, 3100);
       }
-
+      
+      setIsStreaming(false);
     } catch (error) {
       console.error('❌ Chat error:', error);
       
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${error.message}. Please try again.`,
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev.slice(0, -1), errorMessage]);
     } finally {
+      console.log('🔄 Setting isStreaming to false');
       setIsStreaming(false);
     }
   }, [currentResume, analysisResult, sessionId, messages, updateSectionContent]);

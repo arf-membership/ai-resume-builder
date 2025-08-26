@@ -373,7 +373,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             )}
                           </div>
                         </div>
-                        <div className="flex space-x-3">
+                        {/* <div className="flex space-x-3">
                           <button
                             onClick={() => navigate('/chat')}
                             className="group px-4 py-2 text-sm bg-gradient-to-r from-emerald-500/20 to-purple-500/20 text-emerald-300 rounded-lg hover:from-emerald-500/30 hover:to-purple-500/30 transition-all duration-300 border border-emerald-500/30 transform hover:scale-105"
@@ -383,7 +383,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                             </svg>
                             ✨ Enhance CV
                           </button>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
                   ))

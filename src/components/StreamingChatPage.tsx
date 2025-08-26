@@ -6,7 +6,8 @@ import { useSession } from '../contexts/SessionContext';
 import { useSectionEdit } from '../hooks/useSectionEdit';
 import { useNotifications } from '../store/notificationStore';
 import { useStreamingChat } from '../hooks/useStreamingChat';
-import { generateChatSuggestions, getImprovementIndicator, type ChatSuggestion } from '../utils/chatSuggestions';
+import { generateChatSuggestions, type ChatSuggestion } from '../utils/chatSuggestions';
+
 
 export const StreamingChatPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,16 +18,46 @@ export const StreamingChatPage: React.FC = () => {
   const analysisResult = useCVStore(state => state.analysisResult);
   const currentResume = useCVStore(state => state.currentResume);
   
+  // Generate suggestions from analysis data
+  const suggestions = analysisResult ? generateChatSuggestions(analysisResult as any) : [];
+  const hasProblematicIssues = suggestions.length > 0;
+  
+  // Track used suggestions per message to show remaining ones
+  const [usedSuggestions, setUsedSuggestions] = useState<Set<string>>(new Set());
+  const [suggestionsByMessage, setSuggestionsByMessage] = useState<{[messageIndex: number]: ChatSuggestion[]}>({});
+  
+  // Initialize suggestions for the first message
+  React.useEffect(() => {
+    if (hasProblematicIssues && suggestions.length > 0 && !suggestionsByMessage[0]) {
+      setSuggestionsByMessage(prev => ({
+        ...prev,
+        0: suggestions.slice(0, 4)
+      }));
+    }
+  }, [hasProblematicIssues, suggestions.length]); // Use suggestions.length instead of suggestions array
+
+
   // Use streaming chat hook
   const { messages, isStreaming, sendMessage } = useStreamingChat();
   
-  // Generate dynamic suggestions based on analysis scores
-  const dynamicSuggestions = useMemo(() => {
-    if (!analysisResult || !('detailed_checks' in analysisResult)) {
-      return [];
+  // Override the first message content if we have problematic issues
+  const displayMessages = useMemo(() => {
+    if (messages.length > 0 && hasProblematicIssues) {
+      const firstMessage = messages[0];
+      if (firstMessage.role === 'assistant') {
+        return [
+          {
+            ...firstMessage,
+            content: `Hi! I've analyzed your CV and found ${suggestions.length} areas that need improvement. Here are my top recommendations to enhance your CV:`
+          },
+          ...messages.slice(1)
+        ];
+      }
     }
-    return generateChatSuggestions(analysisResult as any);
-  }, [analysisResult]);
+    return messages;
+  }, [messages, hasProblematicIssues, suggestions.length]);
+  
+  
   
   // Local state for input and CV update status
   const [inputMessage, setInputMessage] = useState('');
@@ -109,7 +140,7 @@ export const StreamingChatPage: React.FC = () => {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message, index) => (
+          {displayMessages.map((message, index) => (
             <div
               key={index}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -125,6 +156,101 @@ export const StreamingChatPage: React.FC = () => {
                   {message.role === 'user' ? 'You' : 'AI Assistant'}
                 </div>
                 <div className="whitespace-pre-wrap">{message.content}</div>
+                
+                {/* Show suggestions for first AI message if there are problematic issues */}
+                {message.role === 'assistant' && index === 0 && hasProblematicIssues && suggestionsByMessage[0] && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-sm text-gray-400 mb-2">Click a suggestion to get started:</div>
+                    {suggestionsByMessage[0].map((suggestion: ChatSuggestion, suggestionIndex: number) => (
+                      <button
+                        key={suggestionIndex}
+                        onClick={() => {
+                          sendMessage(suggestion.text);
+                          setUsedSuggestions(prev => new Set([...prev, suggestion.text]));
+                          // Store remaining suggestions for next AI message (after user + AI response)
+                          const nextAIMessageIndex = displayMessages.length + 1; // +1 for user message, +1 for AI response
+                          const remaining = suggestionsByMessage[0].filter(s => s.text !== suggestion.text);
+                          setSuggestionsByMessage(prev => ({
+                            ...prev,
+                            [nextAIMessageIndex]: remaining.slice(0, 3)
+                          }));
+                        }}
+                        disabled={isStreaming}
+                        className={`w-full text-left p-3 rounded-lg border transition-all hover:scale-[1.02] disabled:opacity-50 ${
+                          suggestion.priority === 'high'
+                            ? 'bg-red-900/20 border-red-500/30 text-red-300 hover:bg-red-900/30'
+                            : suggestion.priority === 'medium'
+                              ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-900/30'
+                              : 'bg-blue-900/20 border-blue-500/30 text-blue-300 hover:bg-blue-900/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{suggestion.section}</div>
+                            <div className="text-xs opacity-75 mt-1">{suggestion.text}</div>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-3">
+                            <div className="text-xs">
+                              <span className="opacity-75">Score: </span>
+                              <span className="font-medium">{suggestion.currentScore}/100</span>
+                            </div>
+                            {suggestion.priority === 'high' && (
+                              <span className="text-red-400">🔥</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Show remaining suggestions for AI responses after user interactions */}
+                {message.role === 'assistant' && index > 0 && suggestionsByMessage[index] && suggestionsByMessage[index].length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-sm text-gray-400 mb-2">More suggestions to improve your CV:</div>
+                    {suggestionsByMessage[index].map((suggestion: ChatSuggestion, suggestionIndex: number) => (
+                      <button
+                        key={suggestionIndex}
+                        onClick={() => {
+                          sendMessage(suggestion.text);
+                          setUsedSuggestions(prev => new Set([...prev, suggestion.text]));
+                          // Store remaining suggestions for next AI message (after user + AI response)
+                          const nextAIMessageIndex = displayMessages.length + 1; // +1 for user message, +1 for AI response
+                          const currentRemaining = suggestionsByMessage[index].filter(s => s.text !== suggestion.text);
+                          setSuggestionsByMessage(prev => ({
+                            ...prev,
+                            [nextAIMessageIndex]: currentRemaining.slice(0, 3)
+                          }));
+                        }}
+                        disabled={isStreaming}
+                        className={`w-full text-left p-3 rounded-lg border transition-all hover:scale-[1.02] disabled:opacity-50 ${
+                          suggestion.priority === 'high'
+                            ? 'bg-red-900/20 border-red-500/30 text-red-300 hover:bg-red-900/30'
+                            : suggestion.priority === 'medium'
+                              ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-900/30'
+                              : 'bg-blue-900/20 border-blue-500/30 text-blue-300 hover:bg-blue-900/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{suggestion.section}</div>
+                            <div className="text-xs opacity-75 mt-1">{suggestion.text}</div>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-3">
+                            <div className="text-xs">
+                              <span className="opacity-75">Score: </span>
+                              <span className="font-medium">{suggestion.currentScore}/100</span>
+                            </div>
+                            {suggestion.priority === 'high' && (
+                              <span className="text-red-400">🔥</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
                 {isStreaming && index === messages.length - 1 && message.role === 'assistant' && (
                   <div className="mt-2 flex items-center text-xs text-gray-400">
                     <div className="animate-pulse mr-2">●</div>
@@ -173,57 +299,33 @@ export const StreamingChatPage: React.FC = () => {
             </button>
           </div>
           
-          {/* Smart Suggestions - Based on Analysis Scores */}
-          <div className="mt-3 space-y-2">
-            <div className="text-xs text-gray-400 font-medium">
-              📊 Suggested Improvements ({dynamicSuggestions.length} areas need attention)
+          {/* Quick Suggestions - only show if no AI message suggestions are present */}
+          {!hasProblematicIssues && (
+            <div className="mt-3 space-y-2">
+              <div className="text-xs text-gray-400 font-medium">
+                💡 Quick suggestions:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "Make my professional summary more impactful",
+                  "Improve my work experience descriptions",
+                  "Optimize my skills section",
+                  "Enhance my CV formatting"
+                ].map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      sendMessage(suggestion);
+                    }}
+                    disabled={isStreaming}
+                    className="px-3 py-2 text-xs bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {dynamicSuggestions.slice(0, 4).map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setInputMessage(suggestion.text);
-                    sendMessage(suggestion.text);
-                  }}
-                  disabled={isStreaming}
-                  className={`group relative px-3 py-2 text-xs rounded-lg transition-all disabled:opacity-50 border ${
-                    suggestion.priority === 'high' 
-                      ? 'bg-red-900/20 border-red-500/30 text-red-300 hover:bg-red-900/30' 
-                      : suggestion.priority === 'medium'
-                        ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-900/30'
-                        : 'bg-blue-900/20 border-blue-500/30 text-blue-300 hover:bg-blue-900/30'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="flex-1">{suggestion.text}</span>
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs opacity-75">
-                        {getImprovementIndicator(suggestion.currentScore, suggestion.expectedImprovement)}
-                      </span>
-                      {suggestion.priority === 'high' && (
-                        <span className="text-red-400">🔥</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                    <div className="font-medium">{suggestion.section}</div>
-                    <div>Current: {suggestion.currentScore}/100</div>
-                    <div>Expected: +{suggestion.expectedImprovement} points</div>
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                  </div>
-                </button>
-              ))}
-              
-              {dynamicSuggestions.length === 0 && (
-                <div className="text-xs text-green-400 bg-green-900/20 px-3 py-2 rounded-lg border border-green-500/30">
-                  🎉 Great job! All sections are scoring well (80+)
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

@@ -21,6 +21,39 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
   const [previousHeader, setPreviousHeader] = React.useState<CVHeader | undefined>(undefined);
   const [isUpdating, setIsUpdating] = React.useState(false);
 
+  // Listen for CV section updates from chat
+  React.useEffect(() => {
+    const handleCVUpdates = (event: CustomEvent) => {
+      const { updatedSections } = event.detail;
+      console.log('🎨 CVStructuredView: Received CV updates event:', updatedSections);
+      
+      if (updatedSections && updatedSections.length > 0) {
+        setRecentlyUpdatedSections(new Set(updatedSections));
+        setIsUpdating(true);
+        
+        // Clear highlights after 3 seconds
+        setTimeout(() => {
+          setRecentlyUpdatedSections(new Set());
+          setIsUpdating(false);
+        }, 3000);
+      }
+    };
+    
+    const handleClearHighlights = () => {
+      console.log('🎨 CVStructuredView: Clearing highlights');
+      setRecentlyUpdatedSections(new Set());
+      setIsUpdating(false);
+    };
+    
+    window.addEventListener('cv-sections-updated', handleCVUpdates as EventListener);
+    window.addEventListener('clear-cv-highlights', handleClearHighlights);
+    
+    return () => {
+      window.removeEventListener('cv-sections-updated', handleCVUpdates as EventListener);
+      window.removeEventListener('clear-cv-highlights', handleClearHighlights);
+    };
+  }, []);
+
   // Track changes to cv_header content
   React.useEffect(() => {
     if (previousHeader && cvHeader) {
@@ -49,14 +82,12 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
     setPreviousHeader(cvHeader ? { ...cvHeader } : undefined);
   }, [cvHeader]);
 
-  // Track changes to originalSections content
+  // Track changes to sections content
   React.useEffect(() => {
-    console.log('🎨 CVStructuredView: Original sections changed:', originalSections.length);
-    
-    if (previousSections.length > 0) {
+    if (previousSections.length > 0 && originalSections.length > 0) {
       const changedSections = new Set<string>();
       
-      originalSections.forEach((currentSection) => {
+      originalSections.forEach(currentSection => {
         const previousSection = previousSections.find(p => p.section_name === currentSection.section_name);
         if (previousSection && previousSection.content !== currentSection.content) {
           // Additional validation: make sure the change is significant (not just whitespace)
@@ -86,24 +117,45 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
           setRecentlyUpdatedSections(new Set(changedSections)); // Create fresh set
         }, 100);
         
-        // Clear highlights after 3 seconds
+        // Clear highlights after 5 seconds OR when streaming completes
         const clearTimeoutId = setTimeout(() => {
           console.log('🎨 CVStructuredView: Clearing highlights completely');
           setRecentlyUpdatedSections(new Set()); // Complete reset
           setIsUpdating(false); // Reset flag
-        }, 3500);
+        }, 5000);
+        
+        // Listen for streaming completion to clear highlights immediately
+        const handleStreamingComplete = () => {
+          console.log('🎨 CVStructuredView: Streaming complete, clearing highlights');
+          clearTimeout(clearTimeoutId);
+          setRecentlyUpdatedSections(new Set());
+          setIsUpdating(false);
+        };
+        
+        // Add event listener for streaming completion
+        window.addEventListener('streaming-complete', handleStreamingComplete);
         
         return () => {
           clearTimeout(timeoutId);
           clearTimeout(clearTimeoutId);
+          window.removeEventListener('streaming-complete', handleStreamingComplete);
           setIsUpdating(false);
         };
       }
     }
-    
-    // Update previous sections for next comparison - use deep copy
-    setPreviousSections(originalSections.map(section => ({ ...section })));
-  }, [originalSections]);
+  }, [originalSections, isUpdating]);
+  
+  // Update previous sections only after highlights are processed
+  React.useEffect(() => {
+    if (!isUpdating) {
+      // Add a small delay to ensure the update effect is visible
+      const timer = setTimeout(() => {
+        setPreviousSections(originalSections.map(section => ({ ...section })));
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [originalSections, isUpdating]);
 
   const getSectionScore = (sectionName: string): number | undefined => {
     const section = sections.find(s => 
@@ -120,6 +172,15 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
   // Debug log when sections change
   if (originalSections.length > 0) {
     console.log('🎨 CVStructuredView: Rendering', originalSections.length, 'sections');
+    console.log('🎨 Section names:', originalSections.map(s => s.section_name));
+    console.log('🎨 First section content preview:', originalSections[0]?.content?.substring(0, 100));
+  } else {
+    console.log('🎨 CVStructuredView: No originalSections available');
+    console.log('🎨 Available props:', { 
+      structuredContent: !!structuredContent, 
+      sections: sections.length, 
+      cvHeader: !!cvHeader 
+    });
   }
 
   // If we have original sections, show them even without structured content
@@ -194,6 +255,7 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
 
             {/* CV Sections */}
             {originalSections
+              .filter(section => section.section_name.toLowerCase() !== 'header')
               .sort((a, b) => a.order - b.order)
               .map((section, index) => {
                 const isRecentlyUpdated = recentlyUpdatedSections.has(section.section_name);

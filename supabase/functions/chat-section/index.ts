@@ -40,8 +40,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Handle CV improvement chat with streaming
-async function handleCVImprovementChatStream({
+// Handle CV improvement chat with JSON response
+async function handleCVImprovementChat({
   resumeId,
   sessionId,
   message,
@@ -65,7 +65,7 @@ async function handleCVImprovementChatStream({
       resumeId 
     });
 
-    // Build conversation context
+    // Build conversation context - exclude conversation history to prevent confusion
     const messages = [
       {
         role: 'system' as const,
@@ -76,160 +76,64 @@ async function handleCVImprovementChatStream({
         content: `Current CV Analysis Data:
 ${JSON.stringify(currentCV, null, 2)}
 
-User Request: ${message}
+USER REQUEST: ${message}
 
-Previous Conversation:
-${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+CRITICAL INSTRUCTIONS:
+1. Analyze the user's request to identify which CV section they want to modify
+2. If they mention "certification" or "certifications", update the CERTIFICATIONS section
+3. If they mention "skills" or "technical skills", update the SKILLS or TECHNICAL SKILLS section
+4. If they mention "experience" or "work", update the EXPERIENCE section
+5. Return cv_updates with the EXACT section name that matches their request
+6. Do NOT use conversation history - focus only on this current request
 
-Please provide a helpful conversational response and any specific CV section updates.`
+Please provide a conversational response and update the specific CV section mentioned in the user's request.`
       }
     ];
 
     console.log('🚀 Sending streaming request to OpenAI for CV improvement');
 
-    // Get AI response with streaming using our service
-    const openaiStream = await openaiService.createStreamingChatCompletion(messages, {
+    // Get AI response using regular chat completion (no streaming)
+    const openaiResponse = await openaiService.createChatCompletion(messages, {
       model: 'gpt-4o-mini',
       temperature: 0.5,
     });
 
-    // Create a readable stream for server-sent events
-    const readable = new ReadableStream({
-      async start(controller) {
-        let fullResponse = '';
-        let lastCvUpdateSent = '';
-        const reader = openaiStream.getReader();
-        const decoder = new TextDecoder();
-        
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+    const fullResponse = openaiResponse.choices[0]?.message?.content || '';
+    console.log('✅ OpenAI response received, processing response');
+    
+    // Process the complete response to extract cv_updates and score improvements
+    let cvUpdates = {};
+    let scoreImprovements = {};
+    let conversationalResponse = fullResponse;
+    
+    try {
+      const parsedResponse = parseGlobalChatResponse(fullResponse);
+      cvUpdates = parsedResponse.cv_updates || {};
+      scoreImprovements = parsedResponse.score_improvements || {};
+      conversationalResponse = parsedResponse.conversational_response || fullResponse;
+    } catch (parseError) {
+      console.warn('⚠️ Could not parse response, using raw response');
+    }
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+    // Return complete JSON response with all sections and updated sections
+    const responseData = {
+      success: true,
+      response: conversationalResponse,
+      cv_updates: cvUpdates,
+      score_improvements: scoreImprovements,
+      all_sections: currentCV.original_cv_sections || currentCV.sections || [],
+      updated_sections: Object.keys(cvUpdates)
+    };
 
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const dataStr = line.slice(6);
-                if (dataStr === '[DONE]') continue;
-                
-                try {
-                  const data = JSON.parse(dataStr);
-                  const content = data.choices?.[0]?.delta?.content || '';
-                  
-                  if (content) {
-                    fullResponse += content;
-                    
-                    // Send chunk as server-sent event
-                    const sseData = JSON.stringify({
-                      type: 'chunk',
-                      content: content
-                    });
-                    
-                    controller.enqueue(new TextEncoder().encode(`data: ${sseData}\n\n`));
-
-                    // ✨ PRECISE CV UPDATES DETECTION - Only look for structured JSON
-                    if (fullResponse.length > 200) { // Need more content to avoid false positives
-                      
-                      // Only look for complete cv_updates JSON structure - much more precise
-                      const cvUpdatesMatch = fullResponse.match(/"cv_updates"\s*:\s*\{([^}]+(?:\}[^}]*)*)\}/);
-                      
-                      if (cvUpdatesMatch) {
-                        try {
-                          // Try to parse just the cv_updates section
-                          const cvUpdatesString = `{"cv_updates": {${cvUpdatesMatch[1]}}}`;
-                          const parsed = JSON.parse(cvUpdatesString);
-                          
-                          if (parsed.cv_updates && typeof parsed.cv_updates === 'object') {
-                            // Check if this is different from what we already sent
-                            const currentUpdateKey = JSON.stringify(Object.keys(parsed.cv_updates).sort());
-                            
-                            if (currentUpdateKey !== lastCvUpdateSent) {
-                              console.log(`🌊 Detected structured CV updates:`, Object.keys(parsed.cv_updates));
-                              
-                              // Only send updates that look like actual CV content (not conversational)
-                              const validUpdates = {};
-                              Object.entries(parsed.cv_updates).forEach(([sectionName, content]) => {
-                                if (typeof content === 'string' && 
-                                    content.length > 50 && 
-                                    !content.includes('What do you think') &&
-                                    !content.includes('How about') &&
-                                    !content.includes('?') &&
-                                    !content.startsWith('!')) {
-                                  validUpdates[sectionName] = content;
-                                }
-                              });
-                              
-                              if (Object.keys(validUpdates).length > 0) {
-                                const streamingUpdateData = JSON.stringify({
-                                  type: 'cv_update_stream',
-                                  cv_updates: validUpdates
-                                });
-                                
-                                controller.enqueue(new TextEncoder().encode(`data: ${streamingUpdateData}\n\n`));
-                                lastCvUpdateSent = currentUpdateKey; // Track what we've sent
-                              }
-                            }
-                          }
-                        } catch (parseError) {
-                          // Ignore parsing errors for partial JSON
-                        }
-                      }
-                    }
-                  }
-                } catch (parseError) {
-                  // Ignore parsing errors for individual chunks
-                  console.warn('Could not parse streaming chunk:', line);
-                }
-              }
-            }
-          }
-
-          // Process the complete response to extract cv_updates and score improvements
-          console.log('✅ OpenAI streaming complete, processing final response');
-          
-          let cvUpdates = {};
-          let scoreImprovements = {};
-          try {
-            const parsedResponse = parseGlobalChatResponse(fullResponse);
-            cvUpdates = parsedResponse.cv_updates;
-            scoreImprovements = parsedResponse.score_improvements || {};
-          } catch (parseError) {
-            console.warn('⚠️ Could not parse response from stream, using empty objects');
-          }
-
-          // Send final message with cv_updates and score improvements
-          const finalData = JSON.stringify({
-            type: 'complete',
-            cv_updates: cvUpdates,
-            score_improvements: scoreImprovements,
-            full_response: fullResponse
-          });
-          
-          controller.enqueue(new TextEncoder().encode(`data: ${finalData}\n\n`));
-          controller.close();
-          
-        } catch (error) {
-          console.error('❌ Streaming error:', error);
-          const errorData = JSON.stringify({
-            type: 'error',
-            error: error.message
-          });
-          controller.enqueue(new TextEncoder().encode(`data: ${errorData}\n\n`));
-          controller.close();
-        }
+    return new Response(
+      JSON.stringify(responseData),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       }
-    });
-
-    return new Response(readable, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    );
 
   } catch (error) {
     console.error('❌ CV improvement streaming error:', error);
@@ -353,10 +257,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('✅ Analysis data found, processing CV improvement request with streaming');
+    console.log('✅ Analysis data found, processing CV improvement request');
 
-    // Handle CV improvement chat with streaming
-    return await handleCVImprovementChatStream({
+    // Handle CV improvement chat
+    return await handleCVImprovementChat({
       resumeId,
       sessionId: effectiveSessionId,
       message,

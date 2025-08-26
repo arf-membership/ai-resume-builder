@@ -50,20 +50,16 @@ export class AnalysisService {
         return cachedResult;
       }
 
-      onProgress?.(10);
-
       // Prepare request payload
       const payload = {
         resumeId,
         pdfPath: null // Let the Edge Function determine the path from the resume record
       };
 
-      onProgress?.(20);
-
       // Call the analyze-cv Edge Function using direct fetch
       // Note: Using fetch directly instead of supabase.functions.invoke due to body serialization issues
-      const functionUrl = `${supabase.supabaseUrl}/functions/v1/analyze-cv`;
-      const supabaseKey = supabase.supabaseKey;
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-cv`;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       const fetchResponse = await fetch(functionUrl, {
         method: 'POST',
@@ -102,12 +98,8 @@ export class AnalysisService {
 
       const analysisResult = data.data.analysis;
 
-      onProgress?.(90);
-
       // Cache the analysis result
       this.cacheAnalysis(resumeId, analysisResult);
-
-      onProgress?.(100);
 
       return analysisResult;
 

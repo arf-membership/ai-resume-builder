@@ -502,6 +502,91 @@ export class OpenAIService {
   }
 
   /**
+   * Create a chat completion using the responses API
+   */
+  async createChatCompletion(
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    options: {
+      model?: string;
+      temperature?: number;
+      max_tokens?: number;
+    } = {}
+  ): Promise<{ choices: Array<{ message: { content: string } }> }> {
+    try {
+      console.log('🔍 Starting chat completion with responses API');
+      
+      const request: OpenAIResponsesRequest = {
+        model: options.model || 'gpt-4o-mini',
+        instructions: messages.find(m => m.role === 'system')?.content || '',
+        temperature: options.temperature || 0.5,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: messages
+                  .filter(m => m.role !== 'system')
+                  .map(m => `${m.role}: ${m.content}`)
+                  .join('\n\n')
+              }
+            ]
+          }
+        ]
+      };
+
+      console.log('🚀 Sending request to OpenAI Responses API');
+      
+      const response = await this.client.createResponse(request);
+      
+      console.log('✅ Response received from OpenAI Responses API');
+      
+      // Extract content from responses API format
+      let content: string | undefined;
+      const responseData = response as any;
+      
+      if (responseData?.output && responseData.output.length > 0) {
+        const assistantMessage = responseData.output.find((item: any) => 
+          item.type === 'message' && item.role === 'assistant'
+        );
+        
+        if (assistantMessage && assistantMessage.content && assistantMessage.content.length > 0) {
+          const textContent = assistantMessage.content?.find((content: any) => 
+            content.type === 'output_text'
+          );
+          
+          if (textContent && textContent.text) {
+            content = textContent.text;
+          }
+        }
+      }
+
+      if (!content) {
+        console.error('❌ No content found in OpenAI Responses API response');
+        throw new Error('No content in OpenAI Responses API response');
+      }
+
+      // Return in the expected chat completion format
+      return {
+        choices: [
+          {
+            message: {
+              content: content
+            }
+          }
+        ]
+      };
+      
+    } catch (error) {
+      console.error('❌ OpenAI chat completion error:', error);
+      if (error instanceof OpenAIError) {
+        throw new Error(`OpenAI API error: ${error.message}`);
+      }
+      throw new Error(`Chat completion failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Edit a specific CV section with AI improvements (kept for legacy edit-section function)
    */
   async editCVSection(

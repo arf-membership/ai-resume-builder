@@ -5,11 +5,13 @@ import { useCVStore } from '../store';
 import { useSession } from '../contexts/SessionContext';
 import { useSectionEdit } from '../hooks/useSectionEdit';
 import { useNotifications } from '../store/notificationStore';
+import { generateChatSuggestions, type ChatSuggestion } from '../utils/chatSuggestions';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  suggestions?: ChatSuggestion[];
 }
 
 export const ChatPage: React.FC = () => {
@@ -21,19 +23,34 @@ export const ChatPage: React.FC = () => {
   const analysisResult = useCVStore(state => state.analysisResult);
   const currentResume = useCVStore(state => state.currentResume);
   
-  // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  // Generate suggestions from analysis data
+  const suggestions = analysisResult ? generateChatSuggestions(analysisResult as any) : [];
+  const hasProblematicIssues = suggestions.length > 0;
+
+  // Create initial AI message with suggestions if there are problematic issues
+  const getInitialMessage = (): ChatMessage => {
+    if (hasProblematicIssues) {
+      return {
+        role: 'assistant',
+        content: `Hi! I've analyzed your CV and found ${suggestions.length} areas that need improvement. Here are my top recommendations to enhance your CV:`,
+        timestamp: new Date(),
+        suggestions: suggestions.slice(0, 4) // Show top 4 suggestions
+      };
+    }
+    return {
       role: 'assistant',
       content: "Hi! I'm here to help you improve your CV. What specific aspect would you like to enhance?",
       timestamp: new Date()
-    }
-  ]);
+    };
+  };
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([getInitialMessage()]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { editSection, isLoading: isEditLoading, sectionUpdates } = useSectionEdit({
+  const { sectionUpdates } = useSectionEdit({
     resumeId: currentResume?.id || '',
     sessionId: sessionId || undefined,
     initialAnalysisData: analysisResult || {} as any,
@@ -57,12 +74,18 @@ export const ChatPage: React.FC = () => {
     }
   }, [analysisResult, currentResume, navigate]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+  const handleSuggestionClick = (suggestion: ChatSuggestion) => {
+    setInputMessage(suggestion.text);
+    handleSendMessage(suggestion.text);
+  };
+
+  const handleSendMessage = async (messageText?: string) => {
+    const messageToSend = messageText || inputMessage.trim();
+    if (!messageToSend || isLoading) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: inputMessage.trim(),
+      content: messageToSend,
       timestamp: new Date()
     };
 
@@ -103,9 +126,7 @@ export const ChatPage: React.FC = () => {
 
       // Apply any CV updates
       if (data.cvUpdates && Object.keys(data.cvUpdates).length > 0) {
-        Object.entries(data.cvUpdates).forEach(([sectionName, content]) => {
-          setSectionUpdate(sectionName, content as string);
-        });
+        // Note: Section updates would be handled by the useSectionEdit hook
         showSuccess('CV Updated', 'Your CV has been enhanced with AI suggestions!');
       }
 
@@ -185,6 +206,49 @@ export const ChatPage: React.FC = () => {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
+                  
+                  {/* Show suggestions if this is an assistant message with suggestions */}
+                  {message.role === 'assistant' && message.suggestions && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm text-gray-300 font-medium">Click on a suggestion to get started:</p>
+                      <div className="grid gap-2">
+                        {message.suggestions.map((suggestion, suggestionIndex) => (
+                          <button
+                            key={suggestionIndex}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            disabled={isLoading}
+                            className={`text-left p-3 rounded-lg border transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed ${
+                              suggestion.priority === 'high'
+                                ? 'bg-red-900/30 border-red-500/50 text-red-200 hover:bg-red-900/50'
+                                : suggestion.priority === 'medium'
+                                ? 'bg-yellow-900/30 border-yellow-500/50 text-yellow-200 hover:bg-yellow-900/50'
+                                : 'bg-blue-900/30 border-blue-500/50 text-blue-200 hover:bg-blue-900/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-sm">{suggestion.section}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  suggestion.priority === 'high'
+                                    ? 'bg-red-500/20 text-red-300'
+                                    : suggestion.priority === 'medium'
+                                    ? 'bg-yellow-500/20 text-yellow-300'
+                                    : 'bg-blue-500/20 text-blue-300'
+                                }`}>
+                                  {suggestion.priority}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {suggestion.currentScore}/100
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs opacity-80">{suggestion.text}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <p className="text-xs opacity-70 mt-2">
                     {message.timestamp.toLocaleTimeString()}
                   </p>
@@ -225,7 +289,7 @@ export const ChatPage: React.FC = () => {
                 />
               </div>
               <button
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 disabled={isLoading || !inputMessage.trim()}
                 className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -235,26 +299,28 @@ export const ChatPage: React.FC = () => {
               </button>
             </div>
             
-            {/* Quick Suggestions */}
-            <div className="mt-4">
-              <p className="text-sm text-gray-400 mb-2">Quick suggestions:</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "Improve my professional summary",
-                  "Add more impact to my experience",
-                  "Optimize for ATS systems",
-                  "Enhance my skills section"
-                ].map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInputMessage(suggestion)}
-                    className="px-3 py-1 text-xs bg-slate-700 text-gray-300 rounded-full hover:bg-slate-600 transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+            {/* Quick Suggestions - only show if no AI message suggestions are present */}
+            {!hasProblematicIssues && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-400 mb-2">Quick suggestions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "Improve my professional summary",
+                    "Add more impact to my experience",
+                    "Optimize for ATS systems",
+                    "Enhance my skills section"
+                  ].map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setInputMessage(suggestion)}
+                      className="px-3 py-1 text-xs bg-slate-700 text-gray-300 rounded-full hover:bg-slate-600 transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
