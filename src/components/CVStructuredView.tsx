@@ -94,7 +94,7 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
   );
 
   React.useEffect(() => {
-    if (previousSections.length > 0 && originalSections.length > 0 && sectionsHash !== previousSectionsHash) {
+    if (previousSections.length > 0 && originalSections.length > 0 && sectionsHash !== previousSectionsHash && !isUpdating) {
       const changedSections = new Set<string>();
       const renamedSections = new Set<string>();
       
@@ -109,7 +109,6 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
             const previousTrimmed = previousSection.content.trim();
             
             if (currentTrimmed !== previousTrimmed) {
-              console.log(`🎨 CVStructuredView: Content changed for "${currentSection.section_name}"`);
               changedSections.add(currentSection.section_name);
             }
           }
@@ -117,11 +116,9 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
           // This might be a renamed section - check if content matches any previous section
           const matchingPreviousSection = previousSections.find(p => p.content === currentSection.content);
           if (matchingPreviousSection) {
-            console.log(`🎨 CVStructuredView: Section renamed from "${matchingPreviousSection.section_name}" to "${currentSection.section_name}"`);
             renamedSections.add(currentSection.section_name);
           } else {
             // This is a new section
-            console.log(`🎨 CVStructuredView: New section added: "${currentSection.section_name}"`);
             changedSections.add(currentSection.section_name);
           }
         }
@@ -129,9 +126,7 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
       
       const allChangedSections = new Set([...changedSections, ...renamedSections]);
       
-      if (allChangedSections.size > 0 && !isUpdating) {
-        console.log('🎨 CVStructuredView: Setting highlights for changes:', Array.from(allChangedSections));
-        
+      if (allChangedSections.size > 0) {
         setIsUpdating(true);
         setRecentlyUpdatedSections(new Set());
         
@@ -151,18 +146,18 @@ export const CVStructuredView: React.FC<CVStructuredViewProps> = ({
         };
       }
     }
-  }, [sectionsHash, previousSectionsHash, isUpdating]);
+  }, [sectionsHash, previousSectionsHash]);
   
   // Update previous sections only when not updating to prevent infinite loops
   React.useEffect(() => {
-    if (!isUpdating && originalSections.length > 0 && sectionsHash !== previousSectionsHash) {
+    if (!isUpdating && originalSections.length > 0) {
       const timer = setTimeout(() => {
         setPreviousSections(originalSections.map(section => ({ ...section })));
-      }, 200);
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [sectionsHash, previousSectionsHash, isUpdating]);
+  }, [originalSections, isUpdating]);
 
   const getSectionScore = (sectionName: string): number | undefined => {
     const section = sections.find(s => 
