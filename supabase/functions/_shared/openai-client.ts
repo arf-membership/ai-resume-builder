@@ -8,8 +8,6 @@ export interface OpenAIConfig {
   apiKey: string;
   baseURL?: string;
   organization?: string;
-  maxRetries?: number;
-  timeout?: number;
 }
 
 // OpenAI API response types
@@ -146,8 +144,6 @@ export class OpenAIClient {
     this.config = {
       baseURL: 'https://api.openai.com/v1',
       organization: undefined,
-      maxRetries: 3,
-      timeout: 60000, // 60 seconds
       ...config,
     };
   }
@@ -158,48 +154,30 @@ export class OpenAIClient {
   async createStreamingChatCompletion(
     request: OpenAIChatCompletionRequest
   ): Promise<ReadableStream<Uint8Array>> {
-    let lastError: Error;
+    const response = await this.makeRequest('/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        ...(this.config.organization && {
+          'OpenAI-Organization': this.config.organization,
+        }),
+      },
+      body: JSON.stringify({
+        ...request,
+        stream: true, // Force streaming
+      }),
+    });
 
-    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        const response = await this.makeRequest('/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-            ...(this.config.organization && {
-              'OpenAI-Organization': this.config.organization,
-            }),
-          },
-          body: JSON.stringify({
-            ...request,
-            stream: true, // Force streaming
-          }),
-          signal: AbortSignal.timeout(this.config.timeout),
-        });
-
-        if (!response.ok) {
-          await this.handleErrorResponse(response);
-        }
-
-        if (!response.body) {
-          throw new Error('No response body for streaming');
-        }
-
-        return response.body;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        
-        if (attempt < this.config.maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          continue;
-        }
-        
-        throw lastError;
-      }
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
     }
 
-    throw lastError!;
+    if (!response.body) {
+      throw new Error('No response body for streaming');
+    }
+
+    return response.body;
   }
 
   /**
@@ -208,100 +186,48 @@ export class OpenAIClient {
   async createResponse(
     request: OpenAIResponsesRequest
   ): Promise<OpenAIResponsesResponse> {
-    let lastError: Error;
+    const response = await this.makeRequest('/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        ...(this.config.organization && {
+          'OpenAI-Organization': this.config.organization,
+        }),
+      },
+      body: JSON.stringify(request),
+    });
 
-    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        const response = await this.makeRequest('/responses', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-            ...(this.config.organization && {
-              'OpenAI-Organization': this.config.organization,
-            }),
-          },
-          body: JSON.stringify(request),
-          signal: AbortSignal.timeout(this.config.timeout),
-        });
-
-        if (!response.ok) {
-          await this.handleErrorResponse(response);
-        }
-
-        return await response.json();
-      } catch (error) {
-        lastError = error as Error;
-        
-        // Don't retry on certain errors
-        if (
-          error instanceof OpenAIError && 
-          error.statusCode && 
-          [400, 401, 403, 404].includes(error.statusCode)
-        ) {
-          throw error;
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < this.config.maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
     }
 
-    throw lastError!;
+    return await response.json();
   }
 
   /**
-   * Create a chat completion with retry logic
+   * Create a chat completion
    */
   async createChatCompletion(
     request: OpenAICompletionRequest
   ): Promise<OpenAICompletionResponse> {
-    let lastError: Error;
+    const response = await this.makeRequest('/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        ...(this.config.organization && {
+          'OpenAI-Organization': this.config.organization,
+        }),
+      },
+      body: JSON.stringify(request),
+    });
 
-    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        const response = await this.makeRequest('/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-            ...(this.config.organization && {
-              'OpenAI-Organization': this.config.organization,
-            }),
-          },
-          body: JSON.stringify(request),
-          signal: AbortSignal.timeout(this.config.timeout),
-        });
-
-        if (!response.ok) {
-          await this.handleErrorResponse(response);
-        }
-
-        return await response.json();
-      } catch (error) {
-        lastError = error as Error;
-        
-        // Don't retry on certain errors
-        if (
-          error instanceof OpenAIError && 
-          error.statusCode && 
-          [400, 401, 403, 404].includes(error.statusCode)
-        ) {
-          throw error;
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < this.config.maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
+    if (!response.ok) {
+      await this.handleErrorResponse(response);
     }
 
-    throw lastError!;
+    return await response.json();
   }
 
   /**
@@ -356,7 +282,5 @@ export async function createOpenAIClient(): Promise<OpenAIClient> {
 
   return new OpenAIClient({
     apiKey,
-    maxRetries: 3,
-    timeout: 60000,
   });
 }

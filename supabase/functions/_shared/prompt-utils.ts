@@ -23,120 +23,8 @@ export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst wi
 - If sections are implied but not explicitly named, use descriptive names
 - Don't assume sections exist if they're not in the CV
 
-🚨 CRITICAL: You must respond with ONLY a valid JSON object, no markdown, no explanations, no code blocks. Start directly with { and end with }. Use this exact format:
-{
-  "strengths": ["List of resume strengths and positive aspects"],
-  "next_steps": ["Recommended next steps for improvement"],
-  "detailed_checks": {
-    "education": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of education section",
-      "suggestions": ["specific improvements for education"]
-    },
-    "formatting": {
-      "score": number (0-100),
-      "status": "pass|warning|fail", 
-      "message": "Assessment of overall formatting and layout",
-      "suggestions": ["specific improvements for formatting"]
-    },
-    "contact_info": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of contact information completeness and format",
-      "suggestions": ["specific improvements for contact info"]
-    },
-    "skills_section": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of skills section relevance and format",
-      "suggestions": ["specific improvements for skills"]
-    },
-    "work_experience": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of work experience section",
-      "suggestions": ["specific improvements for experience"]
-    },
-    "ats_compatibility": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of ATS system compatibility",
-      "suggestions": ["specific improvements for ATS compatibility"]
-    },
-    "keyword_optimization": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of keyword usage and optimization",
-      "suggestions": ["specific improvements for keywords"]
-    },
-    "professional_summary": {
-      "score": number (0-100),
-      "status": "pass|warning|fail",
-      "message": "Assessment of professional summary effectiveness",
-      "suggestions": ["specific improvements for summary"]
-    }
-  },
-  "overall_summary": {
-    "issues": number,
-    "warnings": number,
-    "total_checks": 8,
-    "overall_score": number (0-100),
-    "passed_checks": number
-  },
-  "missing_elements": ["Important elements that are missing from the resume"],
-  "user_informations": {
-    "age": number|null,
-    "education": "high school|bachelor|phd"|null,
-    "graduationDate": "YYYY-MM-DD"|null,
-    "university": "University name and department/profession"|null,
-    "workHistory": {
-      "experienceYears": number|null,
-      "jobCount": number|null
-    }|null,
-    "gender": "string"|null,
-    "courses": ["List of courses taken"]|null,
-    "skills": ["List of user's skills"]|null,
-    "location": {
-      "city": "string"|null,
-      "country": "string"|null
-    }|null,
-    "gdp": number|null
-  },
-  "industry_specific_tips": ["Tips specific to the candidates industry"],
-  "improvement_recommendations": {
-    "high_priority": ["Critical issues that must be fixed"],
-    "medium_priority": ["Important improvements that should be made"],
-    "low_priority": ["Nice-to-have enhancements"]
-  },
-  "original_cv_sections": [
-    {
-      "section_name": "Professional Summary",
-      "content": "Exact content from the CV section",
-      "order": 1
-    },
-    {
-      "section_name": "Work Experience", 
-      "content": "Complete work experience content from CV",
-      "order": 2
-    },
-    {
-      "section_name": "Education",
-      "content": "Complete education content from CV", 
-      "order": 3
-    }
-  ],
-  "cv_header": {
-    "name": "Exact full name from CV header",
-    "title": "Professional title from CV header",
-    "email": "email@domain.com or null",
-    "phone": "+1234567890 or null",
-    "location": "City, Country or null",
-    "linkedin": "linkedin.com/in/profile or null",
-    "github": "github.com/username or null",
-    "website": "website.com or null"
-  }
-}
+## OUTPUT REQUIREMENTS:
+🚨 CRITICAL: Provide structured JSON response following the exact schema defined by the API. No additional formatting, markdown, or explanations.
 
 ## VALIDATION CHECKLIST:
 ❌ If personal_info.name is "Jane Smith", "John Doe", or similar → YOU'RE USING DUMMY DATA - EXTRACT REAL NAME
@@ -149,31 +37,15 @@ export const CV_ANALYSIS_SYSTEM_PROMPT = `You are an expert CV/resume analyst wi
 ✅ Scoring must reflect their field and experience level
 
 ## CRITICAL REQUIREMENTS:
-🚨 **MANDATORY**: You MUST include the "structured_content" field in your JSON response
 🚨 **MANDATORY**: Extract the REAL name from the CV - if you see "Hasan Özdişçi", use exactly that
 🚨 **MANDATORY**: Extract ALL contact information found in the CV (email, phone, LinkedIn, etc.)
-🚨 **MANDATORY**: Convert ALL sections content into structured format, don't leave any empty
-🚨 **MANDATORY**: You MUST include "original_cv_sections" with ALL sections found in the CV in their original order
+🚨 **MANDATORY**: Include "original_cv_sections" with ALL sections found in the CV in their original order
 🚨 **MANDATORY**: Each section in "original_cv_sections" must contain the EXACT content as it appears in the CV
 🚨 **MANDATORY**: Preserve the original structure, formatting, and wording of each section
-🚨 **MANDATORY**: Include ALL sections present in the CV (Professional Summary, Experience, Education, Skills, Projects, Certifications, etc.)
-🚨 **MANDATORY**: You MUST include "cv_header" with ALL fields (name, title, email, phone, location, linkedin, github, website)
+🚨 **MANDATORY**: Include "cv_header" with ALL fields (name, title, email, phone, location, linkedin, github, website)
 🚨 **MANDATORY**: Extract ALL contact information from the header - use exact values found or null if not present
 🚨 **MANDATORY**: Use the EXACT name and title as they appear at the top of the CV
 🚨 **MANDATORY**: For missing contact info, use null (not empty string, not "N/A" - use null)
-
-## EXAMPLE FOR TURKISH CV:
-If CV shows "Hasan Özdişçi" and "Software Developer", your response MUST include:
-"structured_content": {
-  "personal_info": {
-    "name": "Hasan Özdişçi",
-    "title": "Software Developer",
-    "contact": {
-      "email": "actual_email_from_cv",
-      "phone": "actual_phone_from_cv"
-    }
-  }
-}
 
 Remember: This analysis is for a REAL person's career development. Use their ACTUAL information to provide meaningful, personalized guidance that will help them improve their specific CV for their specific career goals.`;
 
@@ -239,6 +111,13 @@ Use this exact format:
   "response": "I've improved your professional summary! It now highlights your skills more effectively. Would you like me to work on another section?",
   "cv_updates": {
     "Professional Summary": "Results-driven Software Developer with 1+ years of hands-on experience in designing, developing, and maintaining robust applications..."
+  },
+  "score_improvements": {
+    "professional_summary": {
+      "previous_score": 65,
+      "new_score": 85,
+      "improvement": 20
+    }
   }
 }`;
 
@@ -258,8 +137,14 @@ export function createAnalysisPrompt(cvText: string): OpenAIMessage[] {
   ];
 }
 
+
+
+
+
+
+
 /**
- * Create section editing prompt
+ * Create section editing prompt (kept for legacy edit-section function)
  */
 export function createSectionEditPrompt(
   sectionName: string,
@@ -293,88 +178,6 @@ Suggestions:
 ${suggestions}${contextText}
 
 Please provide an improved version of this section.`,
-    },
-  ];
-}
-
-/**
- * Create chat prompt for gathering additional information
- */
-export function createChatPrompt(
-  sectionName: string,
-  currentContent: string,
-  suggestions: string,
-  conversationHistory: Array<{ role: string; content: string }> = []
-): OpenAIMessage[] {
-  const messages: OpenAIMessage[] = [
-    {
-      role: 'system',
-      content: CHAT_SYSTEM_PROMPT,
-    },
-    {
-      role: 'user',
-      content: `I need help improving the "${sectionName}" section of my CV. Here's the current content:
-
-${currentContent}
-
-Improvement suggestions:
-${suggestions}
-
-Please ask me specific questions to gather information that will help create a better version of this section.`,
-    },
-  ];
-
-  // Add conversation history
-  conversationHistory.forEach(msg => {
-    if (msg.role === 'user' || msg.role === 'assistant') {
-      messages.push({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      });
-    }
-  });
-
-  return messages;
-}
-
-/**
- * Create follow-up section edit prompt with chat context
- */
-export function createContextualEditPrompt(
-  sectionName: string,
-  currentContent: string,
-  feedback: string,
-  suggestions: string,
-  chatContext: Array<{ role: string; content: string }>
-): OpenAIMessage[] {
-  const contextSummary = chatContext
-    .map(msg => `${msg.role}: ${msg.content}`)
-    .join('\n');
-
-  return [
-    {
-      role: 'system',
-      content: SECTION_EDIT_SYSTEM_PROMPT,
-    },
-    {
-      role: 'user',
-      content: `Please improve the following CV section using the additional context gathered from our conversation:
-
-Section: ${sectionName}
-
-Current Content:
-${currentContent}
-
-Original Feedback:
-${feedback}
-
-Original Suggestions:
-${suggestions}
-
-Conversation Context:
-${contextSummary}
-
-Please provide an improved version of this section incorporating the additional information gathered.`,
     },
   ];
 }
@@ -469,21 +272,18 @@ export function extractResponseContent(response: any): string {
  */
 export const OPENAI_CONFIGS = {
   CV_ANALYSIS: {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1',
     temperature: 0.3,
-    max_tokens: 4000, // Increased to prevent truncation
     response_format: { type: 'json_object' as const },
   },
   SECTION_EDIT: {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1',
     temperature: 0.4,
-    max_tokens: 1500, // Increased
     response_format: { type: 'json_object' as const },
   },
   CHAT: {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1',
     temperature: 0.5,
-    max_tokens: 800, // Increased
     response_format: { type: 'json_object' as const },
   },
 } as const;

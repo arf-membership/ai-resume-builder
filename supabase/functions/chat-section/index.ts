@@ -91,7 +91,6 @@ Please provide a helpful conversational response and any specific CV section upd
     const openaiStream = await openaiService.createStreamingChatCompletion(messages, {
       model: 'gpt-4o-mini',
       temperature: 0.5,
-      max_tokens: 800,
     });
 
     // Create a readable stream for server-sent events
@@ -187,21 +186,24 @@ Please provide a helpful conversational response and any specific CV section upd
             }
           }
 
-          // Process the complete response to extract cv_updates
+          // Process the complete response to extract cv_updates and score improvements
           console.log('✅ OpenAI streaming complete, processing final response');
           
           let cvUpdates = {};
+          let scoreImprovements = {};
           try {
             const parsedResponse = parseGlobalChatResponse(fullResponse);
             cvUpdates = parsedResponse.cv_updates;
+            scoreImprovements = parsedResponse.score_improvements || {};
           } catch (parseError) {
-            console.warn('⚠️ Could not parse cv_updates from stream, using empty object');
+            console.warn('⚠️ Could not parse response from stream, using empty objects');
           }
 
-          // Send final message with cv_updates
+          // Send final message with cv_updates and score improvements
           const finalData = JSON.stringify({
             type: 'complete',
             cv_updates: cvUpdates,
+            score_improvements: scoreImprovements,
             full_response: fullResponse
           });
           

@@ -4,6 +4,36 @@
  * Requirements: 9.1, 9.2
  */
 
+/**
+ * Sanitize filename for security validation - handles Turkish and international characters
+ */
+function sanitizeFilenameForSecurity(filename: string): string {
+  // Map Turkish characters to their ASCII equivalents
+  const turkishCharMap: Record<string, string> = {
+    'ç': 'c', 'Ç': 'C',
+    'ğ': 'g', 'Ğ': 'G', 
+    'ı': 'i', 'I': 'I',
+    'ö': 'o', 'Ö': 'O',
+    'ş': 's', 'Ş': 'S',
+    'ü': 'u', 'Ü': 'U',
+    // Add other common characters
+    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a',
+    'Á': 'A', 'À': 'A', 'Â': 'A', 'Ä': 'A', 'Ã': 'A',
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+    'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E',
+    'ñ': 'n', 'Ñ': 'N'
+  };
+
+  return filename
+    // Convert Turkish and international characters
+    .replace(/./g, (char) => turkishCharMap[char] || char)
+    // Remove problematic characters
+    .replace(/[^a-zA-Z0-9.-]/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase() || 'file';
+}
+
 export interface FileSecurityResult {
   isSecure: boolean;
   threats: string[];
@@ -25,27 +55,7 @@ const PDF_SIGNATURES = [
   [0x25, 0x50, 0x44, 0x46], // %PDF
 ];
 
-/**
- * Suspicious file patterns that might indicate malicious content
- */
-const SUSPICIOUS_PATTERNS = [
-  // JavaScript execution patterns
-  /javascript:/gi,
-  /vbscript:/gi,
-  /onload=/gi,
-  /onerror=/gi,
-  /onclick=/gi,
-  
-  // Embedded executable patterns
-  /\x4d\x5a/g, // MZ header (PE executable)
-  /\x7f\x45\x4c\x46/g, // ELF header
-  
-  // Script injection patterns
-  /<script/gi,
-  /<iframe/gi,
-  /<object/gi,
-  /<embed/gi,
-];
+// Suspicious patterns are now handled in scanForSuspiciousPatterns function for better control
 
 /**
  * Validate file signature matches expected PDF format
@@ -72,10 +82,39 @@ function validatePDFSignature(buffer: ArrayBuffer): boolean {
 function scanForSuspiciousPatterns(buffer: ArrayBuffer): string[] {
   const threats: string[] = [];
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+  const bytes = new Uint8Array(buffer);
   
-  for (const pattern of SUSPICIOUS_PATTERNS) {
+  // Check text-based patterns
+  const textPatterns = [
+    /javascript:/gi,
+    /vbscript:/gi,
+    /onload=/gi,
+    /onerror=/gi,
+    /onclick=/gi,
+    /<script/gi,
+    /<iframe/gi,
+    /<object/gi,
+    /<embed/gi,
+  ];
+  
+  for (const pattern of textPatterns) {
     if (pattern.test(text)) {
       threats.push(`Suspicious pattern detected: ${pattern.source}`);
+    }
+  }
+  
+  // Check for executable headers ONLY at the beginning of file (more precise)
+  if (bytes.length >= 2) {
+    // MZ header at start of file (PE executable)
+    if (bytes[0] === 0x4D && bytes[1] === 0x5A) {
+      threats.push('File appears to be a Windows executable (MZ header at start)');
+    }
+  }
+  
+  if (bytes.length >= 4) {
+    // ELF header at start of file (Linux executable)  
+    if (bytes[0] === 0x7F && bytes[1] === 0x45 && bytes[2] === 0x4C && bytes[3] === 0x46) {
+      threats.push('File appears to be a Linux executable (ELF header at start)');
     }
   }
   
@@ -166,6 +205,9 @@ async function simulateVirusScanning(
   // Scan for malicious content patterns
   if (options.enableMalwareDetection) {
     const contentThreats = scanForSuspiciousPatterns(buffer);
+    if (contentThreats.length > 0) {
+      console.log('⚠️ Content threats detected:', contentThreats);
+    }
     threats.push(...contentThreats);
   }
   
@@ -192,6 +234,17 @@ export async function validateFileUploadSecurity(
   const warnings: string[] = [];
   
   try {
+    // Sanitize filename early with Turkish character support
+    const originalFilename = file.name;
+    const sanitizedFilename = sanitizeFilenameForSecurity(originalFilename);
+    
+    console.log('🔍 Security validation for file:', {
+      original: originalFilename,
+      sanitized: sanitizedFilename,
+      size: file.size,
+      type: file.type
+    });
+    
     // Read file buffer
     const buffer = await file.arrayBuffer();
     
@@ -224,18 +277,11 @@ export async function validateFileUploadSecurity(
       threats.push(...scanResult.threats);
     }
     
-    // Sanitize filename
-    const sanitizedFilename = file.name
-      .replace(/[^a-zA-Z0-9.-]/g, '_')
-      .replace(/_{2,}/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .toLowerCase();
-    
     return {
       isSecure: threats.length === 0,
       threats,
       warnings,
-      sanitizedFilename,
+      sanitizedFilename, // Use the early sanitized filename
     };
     
   } catch (error) {
@@ -311,10 +357,7 @@ export function generateSecureFilePath(
   const sanitizedSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
   
   // Sanitize filename
-  const sanitizedFilename = originalFilename
-    .replace(/[^a-zA-Z0-9.-]/g, '_')
-    .replace(/_{2,}/g, '_')
-    .replace(/^_+|_+$/g, '');
+  const sanitizedFilename = sanitizeFilenameForSecurity(originalFilename);
   
   // Generate unique filename with timestamp
   const uniqueFilename = `${timestamp}_${sanitizedFilename}`;

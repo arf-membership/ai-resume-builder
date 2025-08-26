@@ -163,9 +163,16 @@ export interface ChatResponse {
   requires_more_info: boolean;
 }
 
+export interface ScoreImprovement {
+  previous_score: number;
+  new_score: number;
+  improvement: number;
+}
+
 export interface GlobalChatResponse {
   response: string;
   cv_updates: Record<string, string>;
+  score_improvements?: Record<string, ScoreImprovement>;
 }
 
 // Validation error class
@@ -814,7 +821,8 @@ export function parseGlobalChatResponse(response: string): GlobalChatResponse {
   // Validate required fields with fallbacks
   const result: GlobalChatResponse = {
     response: typeof parsed.response === 'string' ? parsed.response.trim() : 'I understand your request. Let me help you improve your CV.',
-    cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {}
+    cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {},
+    score_improvements: parsed.score_improvements && typeof parsed.score_improvements === 'object' ? parsed.score_improvements : undefined
   };
 
   if (result.response.length === 0) {

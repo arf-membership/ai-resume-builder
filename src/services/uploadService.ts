@@ -73,7 +73,33 @@ export class UploadService {
       });
 
       if (!securityValidation.isSecure) {
-        throw new Error(`File security validation failed: ${securityValidation.threats.join(', ')}`);
+        console.error('🚨 File security validation failed:', {
+          filename: file.name,
+          threats: securityValidation.threats,
+          sanitizedFilename: securityValidation.sanitizedFilename,
+          details: securityValidation
+        });
+        
+        // Provide more helpful error messages
+        const hasExecutableDetection = securityValidation.threats.some(t => 
+          t.includes('executable') || t.includes('MZ header') || t.includes('ELF header')
+        );
+        
+        const hasPatternDetection = securityValidation.threats.some(t => 
+          t.includes('Suspicious pattern detected')
+        );
+        
+        let errorMessage = 'File security validation failed: ' + securityValidation.threats.join(', ');
+        
+        if (hasExecutableDetection) {
+          errorMessage += '. This file appears to be an executable, not a PDF.';
+        } else if (hasPatternDetection) {
+          errorMessage += '. Your PDF file contains patterns that our security system flagged. Please try with a different PDF file.';
+        } else {
+          errorMessage += '. Please try with a simpler PDF file or contact support.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       // Log security warnings if any
@@ -86,9 +112,18 @@ export class UploadService {
 
       // Generate unique filename to prevent conflicts
       const timestamp = Date.now();
+      const originalName = file.name;
       const sanitizedName = sanitizeFilename(securityValidation.sanitizedFilename || file.name);
       const uniqueFilename = `${timestamp}_${sanitizedName}`;
       const filePath = getSessionFilePath(sessionId, uniqueFilename);
+
+      // Log filename transformation for debugging
+      console.log('📁 Filename transformation:', {
+        original: originalName,
+        sanitized: sanitizedName,
+        unique: uniqueFilename,
+        filePath: filePath
+      });
 
       // Check if upload was aborted
       if (signal?.aborted) {
@@ -291,13 +326,7 @@ export class UploadService {
     }
   }
 
-  /**
-   * Sanitize filename to prevent issues (deprecated - use inputSanitization utility)
-   */
-  private static sanitizeFilename(filename: string): string {
-    // Use the centralized sanitization utility
-    return sanitizeFilename(filename);
-  }
+
 
   /**
    * Clean up uploaded file (used when database operations fail)

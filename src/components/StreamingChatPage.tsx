@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CVStructuredView } from './CVStructuredView';
 import { useCVStore } from '../store';
@@ -6,6 +6,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useSectionEdit } from '../hooks/useSectionEdit';
 import { useNotifications } from '../store/notificationStore';
 import { useStreamingChat } from '../hooks/useStreamingChat';
+import { generateChatSuggestions, getImprovementIndicator, type ChatSuggestion } from '../utils/chatSuggestions';
 
 export const StreamingChatPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +19,14 @@ export const StreamingChatPage: React.FC = () => {
   
   // Use streaming chat hook
   const { messages, isStreaming, sendMessage } = useStreamingChat();
+  
+  // Generate dynamic suggestions based on analysis scores
+  const dynamicSuggestions = useMemo(() => {
+    if (!analysisResult || !('detailed_checks' in analysisResult)) {
+      return [];
+    }
+    return generateChatSuggestions(analysisResult as any);
+  }, [analysisResult]);
   
   // Local state for input and CV update status
   const [inputMessage, setInputMessage] = useState('');
@@ -125,6 +134,9 @@ export const StreamingChatPage: React.FC = () => {
               </div>
             </div>
           ))}
+          
+
+          
           <div ref={messagesEndRef} />
         </div>
 
@@ -161,27 +173,56 @@ export const StreamingChatPage: React.FC = () => {
             </button>
           </div>
           
-          {/* Quick Actions */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {[
-              "Improve my professional summary",
-              "Enhance my work experience",
-              "Optimize for ATS",
-              "Add more keywords",
-              "Make it more compelling"
-            ].map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => {
-                  setInputMessage(suggestion);
-                  sendMessage(suggestion);
-                }}
-                disabled={isStreaming}
-                className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-full transition-colors disabled:opacity-50"
-              >
-                {suggestion}
-              </button>
-            ))}
+          {/* Smart Suggestions - Based on Analysis Scores */}
+          <div className="mt-3 space-y-2">
+            <div className="text-xs text-gray-400 font-medium">
+              📊 Suggested Improvements ({dynamicSuggestions.length} areas need attention)
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {dynamicSuggestions.slice(0, 4).map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setInputMessage(suggestion.text);
+                    sendMessage(suggestion.text);
+                  }}
+                  disabled={isStreaming}
+                  className={`group relative px-3 py-2 text-xs rounded-lg transition-all disabled:opacity-50 border ${
+                    suggestion.priority === 'high' 
+                      ? 'bg-red-900/20 border-red-500/30 text-red-300 hover:bg-red-900/30' 
+                      : suggestion.priority === 'medium'
+                        ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-900/30'
+                        : 'bg-blue-900/20 border-blue-500/30 text-blue-300 hover:bg-blue-900/30'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="flex-1">{suggestion.text}</span>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs opacity-75">
+                        {getImprovementIndicator(suggestion.currentScore, suggestion.expectedImprovement)}
+                      </span>
+                      {suggestion.priority === 'high' && (
+                        <span className="text-red-400">🔥</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                    <div className="font-medium">{suggestion.section}</div>
+                    <div>Current: {suggestion.currentScore}/100</div>
+                    <div>Expected: +{suggestion.expectedImprovement} points</div>
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </button>
+              ))}
+              
+              {dynamicSuggestions.length === 0 && (
+                <div className="text-xs text-green-400 bg-green-900/20 px-3 py-2 rounded-lg border border-green-500/30">
+                  🎉 Great job! All sections are scoring well (80+)
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

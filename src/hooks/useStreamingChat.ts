@@ -8,6 +8,12 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+interface ScoreImprovement {
+  previous_score: number;
+  new_score: number;
+  improvement: number;
+}
+
 interface StreamingChatHook {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -176,6 +182,8 @@ export function useStreamingChat(): StreamingChatHook {
                     updateSectionContent(sectionName, content as string);
                   });
                 }
+
+                // Score improvements removed for cleaner UI
               } else if (data.type === 'error') {
                 console.error('❌ Streaming error:', data.error);
                 throw new Error(data.error);

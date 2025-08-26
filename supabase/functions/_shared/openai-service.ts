@@ -12,24 +12,17 @@ import {
   OpenAIResponsesRequest 
 } from './openai-client.ts';
 import {
-  createSectionEditPrompt,
-  createChatPrompt,
-  createContextualEditPrompt,
   extractResponseContent,
   OPENAI_CONFIGS,
-  CV_ANALYSIS_SYSTEM_PROMPT
+  CV_ANALYSIS_SYSTEM_PROMPT,
+  createSectionEditPrompt
 } from './prompt-utils.ts';
 import {
-  parseCVAnalysisResponse,
-  parseSectionEditResponse,
-  parseChatResponse,
   sanitizeTextInput,
-  validateScore,
   ValidationError,
-  type CVAnalysisResponse,
   type ComprehensiveCVAnalysisResponse,
   type SectionEditResponse,
-  type ChatResponse,
+  parseSectionEditResponse
 } from './response-parser.ts';
 
 /**
@@ -315,7 +308,6 @@ export class OpenAIService {
         model: options.model || 'gpt-4o-mini',
         messages,
         temperature: options.temperature || 0.5,
-        max_tokens: options.max_tokens || 800,
         response_format: { type: 'json_object' as const },
         stream: true,
       };
@@ -350,7 +342,6 @@ export class OpenAIService {
         model: 'gpt-4.1',
         instructions: CV_ANALYSIS_SYSTEM_PROMPT,
         temperature: 0.3,
-        max_output_tokens: 4000,
         input: [
           {
             role: 'user',
@@ -511,53 +502,7 @@ export class OpenAIService {
   }
 
   /**
-   * Analyze CV text and return structured feedback (legacy method)
-   */
-  async analyzeCVText(cvText: string): Promise<CVAnalysisResponse> {
-    try {
-      // Sanitize input
-      const sanitizedText = sanitizeTextInput(cvText, 50000);
-
-      // Create prompt
-      const messages = [
-        {
-          role: 'system' as const,
-          content: CV_ANALYSIS_SYSTEM_PROMPT,
-        },
-        {
-          role: 'user' as const,
-          content: `Please analyze the following CV and provide detailed feedback:\n\n${sanitizedText}`,
-        },
-      ];
-
-      // Make OpenAI request
-      const response = await this.client.createChatCompletion({
-        ...OPENAI_CONFIGS.CV_ANALYSIS,
-        messages,
-      });
-
-      // Extract and parse response
-      const content = extractResponseContent(response);
-      
-      // Log raw response for debugging
-      console.log('🔍 Raw OpenAI response length:', content.length);
-      console.log('🔍 Raw OpenAI response preview:', content.substring(0, 200) + '...');
-      
-      return parseCVAnalysisResponse(content);
-
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      if (error instanceof OpenAIError) {
-        throw new Error(`OpenAI API error: ${error.message}`);
-      }
-      throw new Error(`CV analysis failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Edit a specific CV section with AI improvements
+   * Edit a specific CV section with AI improvements (kept for legacy edit-section function)
    */
   async editCVSection(
     sectionName: string,
@@ -606,108 +551,13 @@ export class OpenAIService {
     }
   }
 
-  /**
-   * Generate chat questions for gathering additional information
-   */
-  async generateChatQuestions(
-    sectionName: string,
-    currentContent: string,
-    suggestions: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
-  ): Promise<ChatResponse> {
-    try {
-      // Sanitize inputs
-      const sanitizedSectionName = sanitizeTextInput(sectionName, 100);
-      const sanitizedContent = sanitizeTextInput(currentContent, 5000);
-      const sanitizedSuggestions = sanitizeTextInput(suggestions, 2000);
 
-      // Sanitize conversation history
-      const sanitizedHistory = conversationHistory.map(msg => ({
-        role: msg.role,
-        content: sanitizeTextInput(msg.content, 1000),
-      }));
 
-      // Create prompt
-      const messages = createChatPrompt(
-        sanitizedSectionName,
-        sanitizedContent,
-        sanitizedSuggestions,
-        sanitizedHistory
-      );
 
-      // Make OpenAI request
-      const response = await this.client.createChatCompletion({
-        ...OPENAI_CONFIGS.CHAT,
-        messages,
-      });
 
-      // Extract and parse response
-      const content = extractResponseContent(response);
-      return parseChatResponse(content);
 
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      if (error instanceof OpenAIError) {
-        throw new Error(`OpenAI API error: ${error.message}`);
-      }
-      throw new Error(`Chat generation failed: ${error.message}`);
-    }
-  }
 
-  /**
-   * Edit CV section with chat context
-   */
-  async editSectionWithContext(
-    sectionName: string,
-    currentContent: string,
-    feedback: string,
-    suggestions: string,
-    chatContext: Array<{ role: string; content: string }>
-  ): Promise<SectionEditResponse> {
-    try {
-      // Sanitize inputs
-      const sanitizedSectionName = sanitizeTextInput(sectionName, 100);
-      const sanitizedContent = sanitizeTextInput(currentContent, 5000);
-      const sanitizedFeedback = sanitizeTextInput(feedback, 2000);
-      const sanitizedSuggestions = sanitizeTextInput(suggestions, 2000);
 
-      // Sanitize chat context
-      const sanitizedContext = chatContext.map(msg => ({
-        role: msg.role,
-        content: sanitizeTextInput(msg.content, 1000),
-      }));
-
-      // Create prompt
-      const messages = createContextualEditPrompt(
-        sanitizedSectionName,
-        sanitizedContent,
-        sanitizedFeedback,
-        sanitizedSuggestions,
-        sanitizedContext
-      );
-
-      // Make OpenAI request
-      const response = await this.client.createChatCompletion({
-        ...OPENAI_CONFIGS.SECTION_EDIT,
-        messages,
-      });
-
-      // Extract and parse response
-      const content = extractResponseContent(response);
-      return parseSectionEditResponse(content);
-
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      if (error instanceof OpenAIError) {
-        throw new Error(`OpenAI API error: ${error.message}`);
-      }
-      throw new Error(`Contextual section editing failed: ${error.message}`);
-    }
-  }
 }
 
 /**

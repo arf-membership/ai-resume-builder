@@ -139,27 +139,58 @@ export function validateAndSanitizeInput(
 
 /**
  * Sanitize filename to prevent directory traversal and other attacks
+ * Supports Turkish characters (ç, ğ, ı, ö, ş, ü) and other international characters
  */
 export function sanitizeFilename(filename: string): string {
   if (typeof filename !== 'string') {
     return 'file';
   }
 
+  // Map Turkish characters to their ASCII equivalents for better compatibility
+  const turkishCharMap: Record<string, string> = {
+    'ç': 'c', 'Ç': 'C',
+    'ğ': 'g', 'Ğ': 'G', 
+    'ı': 'i', 'I': 'I',
+    'ö': 'o', 'Ö': 'O',
+    'ş': 's', 'Ş': 'S',
+    'ü': 'u', 'Ü': 'U',
+    // Add other common international characters
+    'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a',
+    'Á': 'A', 'À': 'A', 'Â': 'A', 'Ä': 'A', 'Ã': 'A', 'Å': 'A',
+    'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+    'É': 'E', 'È': 'E', 'Ê': 'E', 'Ë': 'E',
+    'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+    'Í': 'I', 'Ì': 'I', 'Î': 'I', 'Ï': 'I',
+    'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o',
+    'Ó': 'O', 'Ò': 'O', 'Ô': 'O', 'Õ': 'O',
+    'ú': 'u', 'ù': 'u', 'û': 'u',
+    'Ú': 'U', 'Ù': 'U', 'Û': 'U',
+    'ñ': 'n', 'Ñ': 'N',
+    'ç': 'c', 'Ç': 'C'
+  };
+
   return filename
     // Remove directory traversal attempts
     .replace(/\.\./g, '')
     .replace(/[\/\\]/g, '')
     // Remove null bytes and control characters
-    .replace(/[\x00-\x1f\x80-\x9f]/g, '')
-    // Remove dangerous characters
+    .replace(/[\x00-\x1f]/g, '')
+    // Remove dangerous characters but keep safe punctuation
     .replace(/[<>:"|?*]/g, '')
-    // Replace spaces and special chars with underscores
-    .replace(/[^a-zA-Z0-9.-]/g, '_')
+    // Convert Turkish and international characters to ASCII equivalents
+    .replace(/./g, (char) => turkishCharMap[char] || char)
+    // Now only remove truly problematic characters, keeping alphanumeric, dots, hyphens, underscores, and spaces
+    .replace(/[^a-zA-Z0-9.\-_ ]/g, '')
+    // Replace multiple spaces with single spaces
+    .replace(/\s+/g, ' ')
+    // Replace spaces with underscores for better file system compatibility
+    .replace(/\s/g, '_')
     // Remove multiple consecutive underscores
     .replace(/_{2,}/g, '_')
     // Remove leading/trailing underscores and dots
     .replace(/^[._]+|[._]+$/g, '')
-    // Ensure it's not empty
+    // Ensure it's not empty and has reasonable length
+    .substring(0, 100) // Limit length to prevent issues
     || 'file';
 }
 
