@@ -7,9 +7,14 @@ import { useState, useRef } from 'react';
 import { UploadZone } from './UploadZone';
 import { AnalysisResults } from './AnalysisResults';
 import { useSession } from '../contexts/SessionContext';
-import { useCVStore, useStoreActions } from '../store';
+import { useStoreActions } from '../store';
 import { useNotifications } from '../store/notificationStore';
 import { AnalysisService } from '../services/analysisService';
+import { 
+  saveCVAnalysisToStorage, 
+  clearCVAnalysisFromStorage
+} from '../utils/cvStorageUtils';
+import { useCVAnalysisRestore } from '../hooks/useCVAnalysisRestore';
 
 interface CVAnalysisFlowProps {
   className?: string;
@@ -19,8 +24,6 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
   const { sessionId } = useSession();
   const { showError, showSuccess } = useNotifications();
   const actions = useStoreActions();
-  const analysisResult = useCVStore(state => state.analysisResult);
-  const currentResume = useCVStore(state => state.currentResume);
   
   const [uploadedFile, setUploadedFile] = useState<{ resumeId: string; filePath: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -28,9 +31,13 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [currentStage, setCurrentStage] = useState('');
-  const [showResults, setShowResults] = useState(false);
-  
   const analysisRef = useRef<HTMLDivElement>(null);
+  
+  // Use custom hook to handle analysis restoration
+  const { analysisResult, currentResume } = useCVAnalysisRestore(analysisRef);
+
+  // Set showResults based on whether we have analysis data
+  const showResults = Boolean(analysisResult && currentResume);
 
   const handleUploadComplete = (fileData: { resumeId: string; filePath: string }) => {
     setUploadedFile(fileData);
@@ -53,12 +60,15 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
       return;
     }
 
+    // Clear previous analysis data from storage when starting new analysis
+    clearCVAnalysisFromStorage();
+    
     try {
       setIsAnalyzing(true);
       setAnalysisProgress(0);
       setUploadError(null);
       setCurrentStage('Initializing analysis...');
-
+      
       // Set the current resume in the store
       actions.setCurrentResume({
         id: uploadedFile.resumeId,
@@ -95,7 +105,21 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
         
         // Store the analysis result
         actions.setAnalysisResult(result);
-        setShowResults(true);
+        
+        // Save to local storage
+        const currentResumeData = {
+          id: uploadedFile.resumeId,
+          user_session_id: sessionId,
+          original_pdf_path: uploadedFile.filePath,
+          generated_pdf_path: null,
+          analysis_json: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        saveCVAnalysisToStorage(result, currentResumeData, sessionId);
+        
+        // Results will show automatically via computed showResults
         showSuccess('CV Analysis Complete', 'Your CV has been analyzed successfully!');
 
         // Smooth scroll to results after a brief delay
@@ -231,15 +255,29 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
             <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 lg:p-12 shadow-2xl">
               <div className="text-center mb-8">
                 <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-                  Upload Your CV to Get Started
+                  {showResults ? 'Upload New CV for Fresh Analysis' : 'Upload Your CV to Get Started'}
                 </h2>
                 <p className="text-gray-300 text-lg">
-                  Drag and drop your PDF or click to browse. Analysis starts instantly.
+                  {showResults 
+                    ? 'Upload a new CV to clear previous results and start fresh analysis.' 
+                    : 'Drag and drop your PDF or click to browse. Analysis starts instantly.'
+                  }
                 </p>
+                {showResults && (
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <p className="text-blue-300 text-sm">
+                      💡 Your previous analysis is shown below. Upload a new CV to start over.
+                    </p>
+                  </div>
+                )}
               </div>
               
               <UploadZone
-                onUploadComplete={handleUploadComplete}
+                onUploadComplete={(fileData) => {
+                  // Clear results when new file is uploaded
+                  clearCVAnalysisFromStorage();
+                  handleUploadComplete(fileData);
+                }}
                 onUploadProgress={handleUploadProgress}
                 onError={handleUploadError}
                 disabled={uploadProgress > 0 && uploadProgress < 100}
@@ -303,10 +341,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
                   {isAnalyzing && (
                     <div className="mt-8 space-y-6">
                       {/* Current Stage Display */}
-                      <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full border border-purple-500/30 mb-4">
-                          <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
+                      <div className="text-center">   
                         <h3 className="text-white text-xl font-semibold mb-2">
                           {currentStage || 'Processing your CV...'}
                         </h3>
@@ -420,6 +455,15 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
             onSectionEdit={handleSectionEdit}
             onDownloadPDF={handleDownloadPDF}
           />
+        </div>
+      )}
+      
+      {/* Debug info - remove after fixing */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs max-w-sm">
+          <div>showResults: {showResults.toString()}</div>
+          <div>analysisResult: {analysisResult ? 'exists' : 'null'}</div>
+          <div>currentResume: {currentResume ? 'exists' : 'null'}</div>
         </div>
       )}
     </div>
