@@ -120,7 +120,7 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
         saveCVAnalysisToStorage(result, currentResumeData, sessionId);
         
         // Results will show automatically via computed showResults
-        showSuccess('CV Analysis Complete', 'Your CV has been analyzed successfully!');
+        // showSuccess('CV Analysis Complete', 'Your CV has been analyzed successfully!');
 
         // Smooth scroll to results after a brief delay
         setTimeout(() => {
@@ -458,14 +458,6 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
         </div>
       )}
       
-      {/* Debug info - remove after fixing */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs max-w-sm">
-          <div>showResults: {showResults.toString()}</div>
-          <div>analysisResult: {analysisResult ? 'exists' : 'null'}</div>
-          <div>currentResume: {currentResume ? 'exists' : 'null'}</div>
-        </div>
-      )}
     </div>
   );
 }
