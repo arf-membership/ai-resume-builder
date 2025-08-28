@@ -64,7 +64,95 @@ export const StreamingChatPage: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isUpdatingCV, setIsUpdatingCV] = useState(false);
   const [isScoreUpdated, setIsScoreUpdated] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const cvPreviewRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to create simple HTML from store data
+  const createSimpleHTMLFromStore = (cvHeader: any, originalSections: any[]) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Enhanced CV</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+            background: white;
+          }
+          .header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+          }
+          .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+          }
+          .header h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            opacity: 0.9;
+          }
+          .contact-info {
+            font-size: 12px;
+            margin-top: 15px;
+          }
+          .section {
+            margin-bottom: 25px;
+          }
+          .section h3 {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #3b82f6;
+            text-transform: uppercase;
+          }
+          .content {
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+          }
+        </style>
+      </head>
+      <body>
+        ${cvHeader ? `
+          <div class="header">
+            <h1>${cvHeader.name || 'CV Candidate'}</h1>
+            <h2>${cvHeader.title || 'Professional Title'}</h2>
+            <div class="contact-info">
+              ${cvHeader.email ? `📧 ${cvHeader.email}` : ''}
+              ${cvHeader.phone ? ` • 📞 ${cvHeader.phone}` : ''}
+              ${cvHeader.location ? ` • 📍 ${cvHeader.location}` : ''}
+              ${cvHeader.linkedin ? ` • 💼 LinkedIn` : ''}
+              ${cvHeader.github ? ` • 💻 GitHub` : ''}
+            </div>
+          </div>
+        ` : ''}
+        
+        ${originalSections ? originalSections
+          .filter(section => section.section_name.toLowerCase() !== 'header')
+          .sort((a, b) => a.order - b.order)
+          .map(section => `
+            <div class="section">
+              <h3>${section.section_name}</h3>
+              <div class="content">${section.content}</div>
+            </div>
+          `).join('') : ''}
+      </body>
+      </html>
+    `;
+  };
   
   // Monitor for CV updates by watching the store
   const lastUpdated = useRef<number>(Date.now());
@@ -125,6 +213,470 @@ export const StreamingChatPage: React.FC = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!currentResume || !cvPreviewRef.current) {
+      console.error('Missing current resume or CV preview ref');
+      return;
+    }
+
+    try {
+      setIsGeneratingPDF(true);
+      
+      // Get the HTML content from the CV preview
+      const htmlContent = cvPreviewRef.current.innerHTML;
+      console.log('📄 HTML Content Length:', htmlContent.length);
+      console.log('📄 HTML Content Preview:', htmlContent.substring(0, 500));
+      
+      // Check if HTML content is valid, if not create from store data
+      if (!htmlContent || htmlContent.length < 100) {
+        console.log('⚠️ HTML content is short, creating from store data');
+        
+        // Get CV data from store
+        const { cvHeader, originalSections } = useCVStore.getState();
+        
+        if (!cvHeader && (!originalSections || originalSections.length === 0)) {
+          throw new Error('No CV content available for PDF generation');
+        }
+        
+        // Create simple HTML from store data
+        const simpleHtml = createSimpleHTMLFromStore(cvHeader, originalSections);
+        
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'x-session-id': sessionId || '',
+          },
+          body: JSON.stringify({
+            resumeId: currentResume.id,
+            htmlContent: simpleHtml
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`PDF generation failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.data.signedUrl) {
+          // Download the PDF
+          const pdfResponse = await fetch(data.data.signedUrl);
+          const pdfBlob = await pdfResponse.blob();
+          
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = `enhanced_cv_${new Date().toISOString().split('T')[0]}.pdf`;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          URL.revokeObjectURL(blobUrl);
+          console.log('✅ PDF downloaded successfully using store data');
+          return;
+        } else {
+          throw new Error(data.message || 'PDF generation failed');
+        }
+      }
+
+      // Extract text content from HTML for debugging
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+      console.log('📄 Text Content Preview:', textContent.substring(0, 200));
+
+      // Get CV data from the analysis result (same as what's displayed)
+      const { analysisResult } = useCVStore.getState();
+      const cvHeader = (analysisResult as any)?.cv_header;
+      const originalSections = (analysisResult as any)?.original_cv_sections || [];
+      
+      console.log('📊 Store data check:', {
+        hasHeader: !!cvHeader,
+        headerData: cvHeader,
+        sectionsCount: originalSections?.length || 0,
+        sectionsData: originalSections?.slice(0, 2) // Show first 2 sections for debugging
+      });
+      
+      // If no store data, extract from HTML content
+      if (!cvHeader && (!originalSections || originalSections.length === 0)) {
+        console.log('⚠️ No store data found, extracting from HTML content');
+        
+        if (!htmlContent || htmlContent.length < 100) {
+          throw new Error('No CV content available for PDF generation - both store and HTML are empty');
+        }
+        
+        // Extract text content and create a simple PDF
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        const extractedText = tempDiv.textContent || tempDiv.innerText || '';
+        
+        if (extractedText.length < 50) {
+          throw new Error('CV content is too short for PDF generation');
+        }
+        
+        // Create simple HTML from extracted content
+        const simpleHtmlContent = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Enhanced CV - ${new Date().toISOString().split('T')[0]}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                line-height: 1.6;
+                color: #333;
+                background: white;
+                margin: 20px;
+                max-width: 800px;
+              }
+              h1, h2, h3 {
+                color: #1f2937;
+                margin-bottom: 10px;
+              }
+              h1 { font-size: 24px; text-align: center; }
+              h2 { font-size: 18px; border-bottom: 2px solid #3b82f6; padding-bottom: 5px; }
+              h3 { font-size: 14px; }
+              p, div { margin-bottom: 8px; }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+          </html>
+        `;
+        
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'x-session-id': sessionId || '',
+          },
+          body: JSON.stringify({
+            resumeId: currentResume.id,
+            htmlContent: simpleHtmlContent
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`PDF generation failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.data.signedUrl) {
+          // Download the PDF
+          const pdfResponse = await fetch(data.data.signedUrl);
+          const pdfBlob = await pdfResponse.blob();
+          
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = `enhanced_cv_${new Date().toISOString().split('T')[0]}.pdf`;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          URL.revokeObjectURL(blobUrl);
+          console.log('✅ PDF downloaded successfully using HTML content');
+          return;
+        } else {
+          throw new Error(data.message || 'PDF generation failed');
+        }
+      }
+
+      // Create clean, simple HTML structure
+      const styledHtmlContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Enhanced CV - ${new Date().toISOString().split('T')[0]}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+              font-size: 12px;
+              line-height: 1.6;
+              color: #333;
+              background: white;
+              margin: 0;
+              padding: 20px;
+              max-width: 800px;
+            }
+            
+            .cv-header {
+              background: white !important;
+              color: #1f2937 !important;
+              padding: 20px 30px 15px 30px;
+              text-align: center;
+              margin-bottom: 20px;
+              border-bottom: 1px solid #e5e7eb;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            
+            .cv-header h1 {
+              font-size: 32px;
+              font-weight: 700;
+              margin: 0 0 8px 0;
+              letter-spacing: -0.5px;
+              color: #1f2937 !important;
+            }
+            
+            .cv-header h2 {
+              font-size: 18px;
+              font-weight: 400;
+              margin: 0 0 12px 0;
+              color: #6b7280 !important;
+            }
+            
+            .contact-info {
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 12px;
+              font-size: 11px;
+            }
+            
+            .contact-item {
+              background: transparent !important;
+              color: #4b5563 !important;
+              padding: 4px 8px;
+              border: none !important;
+              font-size: 11px;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+            }
+            
+            .section {
+              margin-bottom: 30px;
+              page-break-inside: avoid;
+            }
+            
+            .section h3 {
+              font-size: 18px;
+              font-weight: 600;
+              color: #1f2937;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin: 0 0 15px 0;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #3b82f6;
+            }
+            
+            .section-content {
+              font-size: 12px;
+              line-height: 1.6;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            
+            .experience-item {
+              margin-bottom: 25px;
+              padding-left: 20px;
+              border-left: 3px solid #dbeafe;
+              position: relative;
+            }
+            
+            .experience-item:before {
+              content: '';
+              position: absolute;
+              left: -6px;
+              top: 5px;
+              width: 9px;
+              height: 9px;
+              background: #3b82f6;
+              border-radius: 50%;
+            }
+            
+            .job-title {
+              font-size: 15px;
+              font-weight: 600;
+              color: #1f2937;
+              margin-bottom: 4px;
+            }
+            
+            .company {
+              font-size: 13px;
+              color: #3b82f6;
+              font-weight: 500;
+              margin-bottom: 4px;
+            }
+            
+            .duration {
+              font-size: 11px;
+              color: #6b7280;
+              margin-bottom: 10px;
+            }
+            
+            .skills-section {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 20px;
+            }
+            
+            .skill-category {
+              background: #f8fafc;
+              padding: 15px;
+              border-radius: 8px;
+              border: 1px solid #e5e7eb;
+            }
+            
+            .skill-category h4 {
+              font-size: 12px;
+              font-weight: 600;
+              color: #1f2937;
+              margin: 0 0 10px 0;
+              padding-bottom: 5px;
+              border-bottom: 1px solid #3b82f6;
+            }
+            
+            .skill-list {
+              font-size: 11px;
+              line-height: 1.4;
+            }
+            
+            @page {
+              margin: 0.75in;
+              size: A4;
+            }
+            
+            /* Force colors in PDF */
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            
+            .cv-header * {
+              color: inherit !important;
+            }
+            
+            .contact-item * {
+              color: #4b5563 !important;
+            }
+            
+            @media print {
+              body {
+                font-size: 11px;
+              }
+              .cv-header {
+                background: white !important;
+                color: #1f2937 !important;
+              }
+              .cv-header h1 {
+                font-size: 28px;
+                color: #1f2937 !important;
+              }
+              .cv-header h2 {
+                font-size: 16px;
+                color: #6b7280 !important;
+              }
+              .contact-item {
+                background: transparent !important;
+                color: #4b5563 !important;
+                border: none !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${cvHeader ? `
+            <div class="cv-header">
+              <h1>${cvHeader.name || 'Professional CV'}</h1>
+              <h2>${cvHeader.title || 'Software Developer'}</h2>
+              <div class="contact-info">
+                ${cvHeader.email ? `<div class="contact-item">📧 ${cvHeader.email}</div>` : ''}
+                ${cvHeader.phone ? `<div class="contact-item">📞 ${cvHeader.phone}</div>` : ''}
+                ${cvHeader.location ? `<div class="contact-item">📍 ${cvHeader.location}</div>` : ''}
+                ${cvHeader.linkedin ? `<div class="contact-item">💼 LinkedIn</div>` : ''}
+                ${cvHeader.github ? `<div class="contact-item">💻 GitHub</div>` : ''}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${originalSections ? originalSections
+            .filter(section => section.section_name.toLowerCase() !== 'header')
+            .sort((a, b) => a.order - b.order)
+            .map(section => `
+              <div class="section">
+                <h3>${section.section_name}</h3>
+                <div class="section-content">${section.content}</div>
+              </div>
+            `).join('') : ''}
+        </body>
+        </html>
+      `;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'x-session-id': sessionId || '',
+        },
+        body: JSON.stringify({
+          resumeId: currentResume.id,
+          htmlContent: styledHtmlContent
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`PDF generation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data.signedUrl) {
+        // Fetch the PDF and force download without opening in new tab
+        try {
+          const pdfResponse = await fetch(data.data.signedUrl);
+          const pdfBlob = await pdfResponse.blob();
+          
+          // Create blob URL and download link
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = `enhanced_cv_${new Date().toISOString().split('T')[0]}.pdf`;
+          link.style.display = 'none';
+          
+          // Add to DOM, trigger download, and cleanup
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up blob URL
+          URL.revokeObjectURL(blobUrl);
+          
+          console.log('✅ PDF downloaded successfully');
+        } catch (downloadError) {
+          console.error('❌ Download failed, trying direct link:', downloadError);
+          // Fallback to direct link if blob approach fails
+          window.location.href = data.data.signedUrl;
+        }
+      } else {
+        throw new Error(data.message || 'PDF generation failed');
+      }
+
+    } catch (error) {
+      console.error('❌ PDF download error:', error);
+      alert(`Failed to download PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -349,31 +901,59 @@ export const StreamingChatPage: React.FC = () => {
       {/* Right Side - Live CV Preview */}
       <div className="w-2/5 bg-gray-100">
         <div className="p-4 bg-slate-800 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white flex items-center">
-            <div className={`w-3 h-3 rounded-full mr-2 ${
-              isUpdatingCV 
-                ? 'bg-orange-500 animate-bounce' 
-                : isStreaming 
-                  ? 'bg-purple-500 animate-pulse' 
-                  : 'bg-green-500 animate-pulse'
-            }`}></div>
-            {isUpdatingCV ? 'Updating CV...' : isStreaming ? 'AI Processing...' : 'Live CV Preview'}
-          </h2>
-          <p className="text-sm text-gray-400">
-            {isUpdatingCV 
-              ? 'CV sections are being updated!' 
-              : 'Watch your CV improve as you chat with AI'
-            }
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  isUpdatingCV 
+                    ? 'bg-orange-500 animate-bounce' 
+                    : isStreaming 
+                      ? 'bg-purple-500 animate-pulse' 
+                      : 'bg-green-500 animate-pulse'
+                }`}></div>
+                {isUpdatingCV ? 'Updating CV...' : isStreaming ? 'AI Processing...' : 'Live CV Preview'}
+              </h2>
+              <p className="text-sm text-gray-400">
+                {isUpdatingCV 
+                  ? 'CV sections are being updated!' 
+                  : 'Watch your CV improve as you chat with AI'
+                }
+              </p>
+            </div>
+            
+            {/* Download PDF Button */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF || !currentResume}
+              className="group relative px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center space-x-2 shadow-lg hover:shadow-green-500/25 transform hover:scale-105 disabled:hover:scale-100"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 rounded-lg opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              {isGeneratingPDF ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  <span className="text-sm font-medium">Generating...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-sm font-medium">Download PDF</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
-        <div className="h-[calc(100%-80px)] overflow-hidden">
-          <CVStructuredView
-            structuredContent={analysisResult?.structured_content}
-            sections={analysisResult?.sections}
-            originalSections={(analysisResult as any)?.original_cv_sections || []}
-            cvHeader={(analysisResult as any)?.cv_header}
-            updates={{}} // We'll handle updates through direct store changes for now
-          />
+        <div className="h-[calc(100%-120px)] overflow-hidden">
+          <div ref={cvPreviewRef} className="h-full overflow-y-auto">
+            <CVStructuredView
+              structuredContent={analysisResult?.structured_content}
+              sections={analysisResult?.sections}
+              originalSections={(analysisResult as any)?.original_cv_sections || []}
+              cvHeader={(analysisResult as any)?.cv_header}
+              updates={{}} // We'll handle updates through direct store changes for now
+            />
+          </div>
         </div>
       </div>
     </div>

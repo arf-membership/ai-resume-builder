@@ -39,9 +39,18 @@ async function convertHtmlToPdf(htmlContent: string): Promise<Uint8Array> {
   try {
     log('info', 'Starting HTML to PDF conversion using Gotenberg');
 
+    // Log incoming HTML content for debugging
+    log('info', 'Received HTML content', { 
+      htmlLength: htmlContent.length,
+      hasDoctype: htmlContent.toLowerCase().includes('<!doctype'),
+      hasHtml: htmlContent.toLowerCase().includes('<html'),
+      preview: htmlContent.substring(0, 200)
+    });
+
     // Ensure HTML is a complete document
     let completeHtml = htmlContent;
     if (!htmlContent.toLowerCase().includes('<!doctype') && !htmlContent.toLowerCase().includes('<html')) {
+      log('info', 'Adding HTML wrapper to content');
       completeHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,13 +58,27 @@ async function convertHtmlToPdf(htmlContent: string): Promise<Uint8Array> {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enhanced CV</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        body { 
+          font-family: Arial, sans-serif; 
+          margin: 20px; 
+          line-height: 1.6; 
+          color: #333;
+          background: white;
+        }
+        * {
+          visibility: visible !important;
+        }
     </style>
 </head>
 <body>
     ${htmlContent}
 </body>
 </html>`;
+    }
+
+    // Validate HTML content
+    if (completeHtml.length < 50) {
+      throw new Error('HTML content is too short or empty');
     }
 
     log('info', 'HTML content prepared', { htmlLength: completeHtml.length });
