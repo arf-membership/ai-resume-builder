@@ -65,6 +65,7 @@ export const StreamingChatPage: React.FC = () => {
   const [isUpdatingCV, setIsUpdatingCV] = useState(false);
   const [isScoreUpdated, setIsScoreUpdated] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isScorePanelOpen, setIsScorePanelOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const cvPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -684,27 +685,72 @@ export const StreamingChatPage: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-900 text-white">
-      {/* Left Side - Score Timeline */}
-      <div className={`w-1/5 bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-500 ${
+      {/* Left Side - Score Timeline Panel */}
+      <div className={`${
+        isScorePanelOpen ? 'w-1/5' : 'w-12'
+      } bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-500 ease-in-out ${
         isScoreUpdated ? 'ring-2 ring-green-400 ring-opacity-75 shadow-lg shadow-green-400/20' : ''
       }`}>
+        {/* Panel Header with Toggle */}
         <div className={`p-4 border-b border-slate-700 flex-shrink-0 transition-all duration-500 ${
           isScoreUpdated ? 'bg-green-900/20 border-green-500/30' : ''
         }`}>
-          <h2 className={`text-lg font-semibold transition-colors duration-500 ${
-            isScoreUpdated ? 'text-green-300' : 'text-white'
-          }`}>
-            Score Progress {isScoreUpdated && <span className="ml-2 text-green-400">✨</span>}
-          </h2>
-          <p className="text-sm text-gray-400">Track your CV improvements</p>
+          <div className="flex items-center justify-between">
+            {isScorePanelOpen ? (
+              <>
+                <div>
+                  <h2 className={`text-lg font-semibold transition-colors duration-500 ${
+                    isScoreUpdated ? 'text-green-300' : 'text-white'
+                  }`}>
+                    Score Progress {isScoreUpdated && <span className="ml-2 text-green-400">✨</span>}
+                  </h2>
+                  <p className="text-sm text-gray-400">Track your CV improvements</p>
+                </div>
+                <button
+                  onClick={() => setIsScorePanelOpen(false)}
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors duration-200 group"
+                  title="Close score panel"
+                >
+                  <svg className="w-5 h-5 text-gray-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsScorePanelOpen(true)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors duration-200 group w-full"
+                title="Open score panel"
+              >
+                <svg className="w-5 h-5 text-gray-400 group-hover:text-white mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          <ScoreTimeline />
-        </div>
+        
+        {/* Panel Content */}
+        {isScorePanelOpen && (
+          <div className="flex-1 overflow-y-auto">
+            <ScoreTimeline />
+          </div>
+        )}
+        
+        {/* Collapsed state indicator */}
+        {!isScorePanelOpen && (
+          <div className="flex-1 flex flex-col items-center justify-center py-4">
+            <div className="writing-mode-vertical text-xs text-gray-400 transform rotate-180" style={{writingMode: 'vertical-rl'}}>
+              Score Progress
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Middle - Chat Interface */}
-      <div className="w-2/5 flex flex-col">
+      <div className={`${
+        isScorePanelOpen ? 'w-2/5' : 'w-1/2'
+      } flex flex-col transition-all duration-500 ease-in-out`}>
         {/* Header */}
         <div className="p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
           <div>
@@ -899,7 +945,9 @@ export const StreamingChatPage: React.FC = () => {
       </div>
 
       {/* Right Side - Live CV Preview */}
-      <div className="w-2/5 bg-gray-100">
+      <div className={`${
+        isScorePanelOpen ? 'w-2/5' : 'w-1/2'
+      } bg-gray-100 transition-all duration-500 ease-in-out`}>
         <div className="p-4 bg-slate-800 border-b border-slate-700">
           <div className="flex items-center justify-between">
             <div>
