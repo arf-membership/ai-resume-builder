@@ -421,9 +421,9 @@ export const StreamingChatPage: React.FC = () => {
             .cv-header {
               background: white !important;
               color: #1f2937 !important;
-              padding: 20px 30px 15px 30px;
+              padding: 15px 30px 10px 30px;
               text-align: center;
-              margin-bottom: 20px;
+              margin-bottom: 15px;
               border-bottom: 1px solid #e5e7eb;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -432,7 +432,7 @@ export const StreamingChatPage: React.FC = () => {
             .cv-header h1 {
               font-size: 32px;
               font-weight: 700;
-              margin: 0 0 8px 0;
+              margin: 0 0 6px 0;
               letter-spacing: -0.5px;
               color: #1f2937 !important;
             }
@@ -440,7 +440,7 @@ export const StreamingChatPage: React.FC = () => {
             .cv-header h2 {
               font-size: 18px;
               font-weight: 400;
-              margin: 0 0 12px 0;
+              margin: 0 0 8px 0;
               color: #6b7280 !important;
             }
             
@@ -448,19 +448,19 @@ export const StreamingChatPage: React.FC = () => {
               display: flex;
               flex-wrap: wrap;
               justify-content: center;
-              gap: 12px;
+              gap: 10px;
               font-size: 11px;
             }
             
             .contact-item {
               background: transparent !important;
               color: #4b5563 !important;
-              padding: 4px 8px;
+              padding: 2px 6px;
               border: none !important;
               font-size: 11px;
               display: inline-flex;
               align-items: center;
-              gap: 4px;
+              gap: 3px;
             }
             
             .section {
