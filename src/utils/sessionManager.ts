@@ -90,12 +90,16 @@ class SessionManager {
     store.initializeSession();
     
     // Show notification about session expiry
-    const { showWarning } = useNotifications.getState();
-    showWarning(
-      'Session Expired',
-      'Your session has expired. Please start over with a new CV upload.',
-      8000
-    );
+    try {
+      const { showWarning } = useNotifications();
+      showWarning(
+        'Session Expired',
+        'Your session has expired. Please start over with a new CV upload.',
+        8000
+      );
+    } catch (error) {
+      console.warn('Could not show session expiry notification:', error);
+    }
   }
 
   /**
@@ -221,7 +225,7 @@ const sessionManagerSelector = (state: ReturnType<typeof useCVStore.getState>) =
 // React hook for session management
 export const useSessionManager = () => {
   const store = useCVStore(sessionManagerSelector);
-  const { showWarning, showInfo } = useNotifications();
+  const { showInfo } = useNotifications();
 
   return {
     sessionInfo: sessionManager.getSessionInfo(),

@@ -182,7 +182,7 @@ class ErrorHandler {
   /**
    * Handle network errors
    */
-  handleNetworkError(error: Error | string, operation?: string): void {
+  handleNetworkError(_error: Error | string, operation?: string): void {
     let message = 'Network connection issue. Please check your internet connection and try again.';
 
     if (operation) {

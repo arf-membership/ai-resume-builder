@@ -52,21 +52,27 @@ async function convertHtmlToPdf(htmlContent: string): Promise<Uint8Array> {
     if (!htmlContent.toLowerCase().includes('<!doctype') && !htmlContent.toLowerCase().includes('<html')) {
       log('info', 'Adding HTML wrapper to content');
       completeHtml = `<!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enhanced CV</title>
     <style>
         body { 
-          font-family: Arial, sans-serif; 
+          font-family: 'Segoe UI', Tahoma, Arial, 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
           margin: 20px; 
           line-height: 1.6; 
           color: #333;
           background: white;
+          -webkit-font-feature-settings: "liga" on, "kern" on;
+          font-feature-settings: "liga" on, "kern" on;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
         }
         * {
           visibility: visible !important;
+          font-family: inherit !important;
         }
     </style>
 </head>

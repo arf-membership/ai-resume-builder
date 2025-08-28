@@ -4,7 +4,7 @@
  * Requirements: 9.1, 9.2
  */
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { secureSessionManager } from '../utils/secureSessionManagement';
 import type { SessionSecurityInfo } from '../utils/secureSessionManagement';
 import { checkRateLimit } from '../utils/rateLimiting';

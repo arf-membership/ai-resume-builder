@@ -2,7 +2,7 @@
  * PDF Service for generating and downloading enhanced CVs
  */
 
-import { supabase } from '../lib/supabase';
+// import { supabase } from '../lib/supabase'; // Unused import
 
 export interface GeneratePDFRequest {
   resumeId: string;

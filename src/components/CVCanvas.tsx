@@ -4,9 +4,10 @@ import type { CVCanvasProps } from '../types/components';
 import { usePDFGeneration } from '../hooks/usePDFGeneration';
 import { pdfOptimizationService } from '../services/pdfOptimizationService';
 import { trackOperation, trackUserInteraction } from '../services/performanceMonitoringService';
+import { getTurkishPDFConfig, getTurkishPDFLoadingOptions, initializeTurkishSupport } from '../utils/pdfTurkishSupport';
 
-// Configure PDF.js worker with a more reliable approach
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Initialize Turkish character support
+initializeTurkishSupport();
 
 interface CVCanvasState {
   numPages: number | null;
@@ -103,8 +104,8 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
 
     // Initialize PDF optimization service
     try {
-      const pdfDocument = await pdfjs.getDocument(pdfUrl).promise;
-      await pdfOptimizationService.initialize(pdfDocument);
+      const pdfDocument = await pdfjs.getDocument(getTurkishPDFLoadingOptions(pdfUrl)).promise;
+      await pdfOptimizationService.initialize(pdfDocument as any); // Type compatibility issue with pdf.js versions
       
       // Update container dimensions for virtual scrolling
       if (containerRef.current) {
@@ -255,7 +256,7 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
 
     if (touches.length === 2) {
       // Pinch gesture start
-      touchStateRef.current.initialDistance = getTouchDistance(touches);
+      touchStateRef.current.initialDistance = getTouchDistance(touches as any);
       touchStateRef.current.initialScale = state.scale;
       e.preventDefault();
     }
@@ -266,7 +267,7 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
 
     if (touches.length === 2 && touchStateRef.current.initialDistance > 0) {
       // Pinch zoom
-      const currentDistance = getTouchDistance(touches);
+      const currentDistance = getTouchDistance(touches as any);
       const scaleChange = currentDistance / touchStateRef.current.initialDistance;
       const newScale = Math.max(0.25, Math.min(3.0, touchStateRef.current.initialScale * scaleChange));
       
@@ -582,6 +583,7 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
+              options={getTurkishPDFConfig()}
               loading={
                 <div className="flex items-center justify-center p-6 sm:p-8">
                   <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
@@ -605,12 +607,15 @@ const CVCanvas: React.FC<CVCanvasProps> = ({
                 pageNumber={state.currentPage}
                 scale={getResponsiveScale()}
                 onLoadError={onPageLoadError}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
                 loading={
                   <div className="flex items-center justify-center p-6 sm:p-8 bg-white border rounded-lg">
                     <div className="animate-spin rounded-full h-4 w-4 sm:h-6 sm:w-6 border-b-2 border-blue-600"></div>
                   </div>
                 }
                 className="shadow-lg rounded-lg"
+                canvasBackground="white"
               />
             </Document>
 

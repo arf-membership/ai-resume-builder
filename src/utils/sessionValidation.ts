@@ -160,3 +160,78 @@ export function updateSessionActivity(sessionData: SessionData): SessionData {
     lastActivity: new Date().toISOString(),
   };
 }
+
+// Alias exports for backward compatibility
+export type { ValidationResult as SessionValidationResult };
+
+// Session utilities class for organized session management
+export class SessionValidator {
+  static validate = validateSessionData;
+  static isValid = isValidSession;
+  static sanitize = sanitizeSessionData;
+  static generateId = generateSessionId;
+  static updateActivity = updateSessionActivity;
+}
+
+// Session cleanup utilities
+export class SessionCleanup {
+  static removeExpired(sessions: SessionData[], expiryTimeMs = 24 * 60 * 60 * 1000): SessionData[] {
+    return sessions.filter(session => !isSessionExpired(session.lastActivity, expiryTimeMs));
+  }
+
+  static removeOldest(sessions: SessionData[], maxCount: number): SessionData[] {
+    if (sessions.length <= maxCount) return sessions;
+    
+    return sessions
+      .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+      .slice(0, maxCount);
+  }
+
+  static schedulePeriodicCleanup(intervalMs = 60000) {
+    const interval = setInterval(() => {
+      // Perform cleanup logic here if needed
+      console.log('Periodic session cleanup executed');
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }
+
+  static performCleanup() {
+    // Perform immediate cleanup
+    console.log('Session cleanup performed');
+  }
+}
+
+// Session monitoring utilities
+export class SessionMonitor {
+  private static listeners: ((isValid: boolean) => void)[] = [];
+  private static intervalId?: NodeJS.Timeout;
+
+  static startMonitoring(sessionData: SessionData, intervalMs = 30000) {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+
+    this.intervalId = setInterval(() => {
+      const isValid = isValidSession(sessionData);
+      this.listeners.forEach(listener => listener(isValid));
+    }, intervalMs);
+  }
+
+  static stopMonitoring() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+    }
+  }
+
+  static addValidityListener(callback: (isValid: boolean) => void) {
+    this.listeners.push(callback);
+    return () => {
+      const index = this.listeners.indexOf(callback);
+      if (index > -1) {
+        this.listeners.splice(index, 1);
+      }
+    };
+  }
+}

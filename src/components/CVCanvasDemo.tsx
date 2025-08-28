@@ -6,7 +6,7 @@ import type { SectionUpdate } from '../types/components';
  * Demo component for CVCanvas functionality
  * Shows PDF display with mock data and interactive features
  */
-export const CVCanvasDemo: React.FC = () => {
+const CVCanvasDemo: React.FC = () => {
   const [updates, setUpdates] = useState<SectionUpdate[]>([]);
   const [showUpdates, setShowUpdates] = useState(false);
 
@@ -133,3 +133,5 @@ export const CVCanvasDemo: React.FC = () => {
     </div>
   );
 };
+
+export default CVCanvasDemo;

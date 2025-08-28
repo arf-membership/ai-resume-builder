@@ -44,7 +44,7 @@ class InMemoryRateLimiter {
    */
   checkLimit(key: string, config: RateLimitConfig): RateLimitResult {
     const now = Date.now();
-    const windowStart = now - config.windowMs;
+    // const windowStart = now - config.windowMs; // Not currently used
     
     let entry = this.store.get(key);
     

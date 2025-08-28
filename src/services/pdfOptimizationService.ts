@@ -3,8 +3,8 @@
  * Provides efficient PDF rendering for large documents
  */
 
-import { pdfjs } from 'react-pdf';
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+// import { pdfjs } from 'react-pdf'; // Unused import
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 // Configuration for PDF optimization
 const PDF_CONFIG = {
@@ -51,8 +51,8 @@ interface RenderTask {
  */
 class PDFPageRenderer {
   private cache = new Map<string, PageRenderCache>();
-  private renderQueue: RenderTask[] = [];
-  private isRendering = false;
+  // private _renderQueue: RenderTask[] = []; // Unused for now
+  // private _isRendering = false; // Renamed to indicate it's not used yet
   private maxCacheSize: number;
 
   constructor(maxCacheSize: number = PDF_CONFIG.PAGE_CACHE_SIZE) {
@@ -281,7 +281,7 @@ export class PDFOptimizationService {
   /**
    * Update container dimensions
    */
-  updateContainerDimensions(width: number, height: number): void {
+  updateContainerDimensions(_width: number, height: number): void {
     if (this.document) {
       this.virtualScroll.updateDimensions(
         height,
@@ -485,6 +485,7 @@ export class PDFOptimizationService {
 
       // Render page
       const renderContext = {
+        canvas: tempCanvas,
         canvasContext: context,
         viewport: viewport,
       };

@@ -25,7 +25,7 @@ export function generateChatSuggestions(analysisResult: ComprehensiveCVAnalysisR
   Object.entries(detailed_checks).forEach(([sectionKey, checkResult]) => {
     if (!checkResult || typeof checkResult.score !== 'number') return;
 
-    const { score, status, message, suggestions: sectionSuggestions } = checkResult;
+    const { score, status, suggestions: sectionSuggestions } = checkResult;
     
     // Only suggest improvements for scores < 80 (fail/warning)
     if (score < 80) {

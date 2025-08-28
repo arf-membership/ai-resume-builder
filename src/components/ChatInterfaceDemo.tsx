@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { ChatInterface } from './ChatInterface';
 import type { ChatMessage } from '../types';
 
-export const ChatInterfaceDemo: React.FC = () => {
+const ChatInterfaceDemo: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [completedContent, setCompletedContent] = useState<string>('');
 
@@ -71,3 +71,5 @@ export const ChatInterfaceDemo: React.FC = () => {
     </div>
   );
 };
+
+export default ChatInterfaceDemo;

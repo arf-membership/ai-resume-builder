@@ -151,7 +151,7 @@ export function validateSecurityConfig(config = getSecurityConfig()) {
     errors.push('Invalid file upload max size');
   }
 
-  if (config.FILE_UPLOAD.ALLOWED_TYPES.length === 0) {
+  if (config.FILE_UPLOAD.ALLOWED_TYPES.length <= 0) {
     errors.push('No allowed file types specified');
   }
 

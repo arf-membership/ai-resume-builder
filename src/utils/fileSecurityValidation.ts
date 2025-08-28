@@ -225,7 +225,7 @@ export async function validateFileUploadSecurity(
 ): Promise<FileSecurityResult> {
   const {
     enableVirusScanning = true,
-    enableMalwareDetection = true,
+    enableMalwareDetection: _enableMalwareDetection = true,
     enableContentValidation = true,
     maxScanTime = 5000,
   } = options;

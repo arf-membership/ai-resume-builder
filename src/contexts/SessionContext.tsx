@@ -3,8 +3,8 @@
  * Provides session management throughout the application
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { SessionStorageService, type SessionData } from '../services/sessionStorage';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { type SessionData } from '../services/sessionStorage';
 
 interface SessionContextType {
   sessionData: SessionData | null;
@@ -32,7 +32,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
     createdAt: new Date().toISOString(),
     lastActivity: new Date().toISOString(),
   });
-  const [isSessionLoading, setIsSessionLoading] = useState(false);
+  const [isSessionLoading] = useState(false);
 
   /**
    * Simplified refresh session - no complex logic

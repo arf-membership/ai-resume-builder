@@ -78,12 +78,12 @@ interface PageLoadMetric extends BaseMetric {
 type Metric = PerformanceMetric | ErrorMetric | UserInteractionMetric | ResourceMetric | PageLoadMetric;
 
 // Performance observer for Web Vitals
-interface WebVitalsMetric {
-  name: string;
-  value: number;
-  rating: 'good' | 'needs-improvement' | 'poor';
-  delta: number;
-}
+// interface _WebVitalsMetric { // Commented out as it's not used yet
+//   name: string;
+//   value: number;
+//   rating: 'good' | 'needs-improvement' | 'poor';
+//   delta: number;
+// }
 
 /**
  * Performance monitoring service
@@ -256,7 +256,7 @@ export class PerformanceMonitoringService {
         this.addMetric(performanceMetric);
 
         // Also track as error
-        this.trackError(error, 'high', operationName);
+        this.trackError(error instanceof Error ? error : new Error(String(error)), 'high', operationName);
 
         throw error;
       });
@@ -301,7 +301,7 @@ export class PerformanceMonitoringService {
       };
 
       this.addMetric(performanceMetric);
-      this.trackError(error, 'high', operationName);
+      this.trackError(error instanceof Error ? error : new Error(String(error)), 'high', operationName);
 
       throw error;
     }
@@ -401,7 +401,7 @@ export class PerformanceMonitoringService {
    * Track navigation timing
    */
   private trackNavigationTiming(entry: PerformanceNavigationTiming): void {
-    const loadTime = entry.loadEventEnd - entry.navigationStart;
+    const loadTime = entry.loadEventEnd - (entry as any).navigationStart;
     
     const metric: PageLoadMetric = {
       ...this.createBaseMetric('pageload'),
@@ -504,10 +504,10 @@ export class PerformanceMonitoringService {
     
     if (navigation) {
       const metrics = {
-        domContentLoaded: navigation.domContentLoadedEventEnd - navigation.navigationStart,
-        loadComplete: navigation.loadEventEnd - navigation.navigationStart,
-        firstByte: navigation.responseStart - navigation.navigationStart,
-        domInteractive: navigation.domInteractive - navigation.navigationStart,
+                domContentLoaded: navigation.domContentLoadedEventEnd - (navigation as any).navigationStart,
+        loadComplete: navigation.loadEventEnd - (navigation as any).navigationStart,      
+        firstByte: navigation.responseStart - (navigation as any).navigationStart,        
+        domInteractive: navigation.domInteractive - (navigation as any).navigationStart,
       };
 
       Object.entries(metrics).forEach(([name, value]) => {

@@ -87,7 +87,7 @@ export class PDFGenerationService {
           'x-session-id': sessionId,
           'Content-Type': 'application/json',
         },
-        signal,
+        // signal not supported in fetch headers
       });
 
       if (error) {
@@ -188,7 +188,7 @@ export class PDFGenerationService {
         sessionId,
         sectionUpdates,
         { 
-          signal, 
+          // signal not supported in fetch headers 
           onProgress: (progress) => {
             onProgress?.({ ...progress, percentage: progress.percentage * 0.8 });
           }

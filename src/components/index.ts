@@ -1,5 +1,5 @@
 // Export all components from this file
-export { SessionDemo } from './SessionDemo';
+export { default as SessionDemo } from './SessionDemo';
 export { LandingPage } from './LandingPage';
 export { UploadZone } from './UploadZone';
 export { ProgressIndicator } from './ProgressIndicator';
@@ -12,13 +12,13 @@ export { ScoreDisplay } from './ScoreDisplay';
 export { ScoreTimeline } from './ScoreTimeline';
 export { OverallScoreDisplay } from './OverallScoreDisplay';
 export { ATSCompatibilityCard } from './ATSCompatibilityCard';
-export { AnalysisResultsDemo } from './AnalysisResultsDemo';
+export { default as AnalysisResultsDemo } from './AnalysisResultsDemo';
 
 // Chat Interface Components
 export { ChatInterface } from './ChatInterface';
-export { ChatInterfaceDemo } from './ChatInterfaceDemo';
+export { default as ChatInterfaceDemo } from './ChatInterfaceDemo';
 
 // PDF Display Components
 export { default as CVCanvas } from './CVCanvas';
-export { CVCanvasDemo } from './CVCanvasDemo';
+export { default as CVCanvasDemo } from './CVCanvasDemo';
 export { default as CVStructuredView } from './CVStructuredView';

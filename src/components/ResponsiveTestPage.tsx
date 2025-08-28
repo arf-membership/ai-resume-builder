@@ -47,7 +47,7 @@ const mockAnalysisData: CVAnalysisResult = {
 
 const mockSection: CVSection = mockAnalysisData.sections[0];
 
-export function ResponsiveTestPage() {
+function ResponsiveTestPage() {
   const [currentView, setCurrentView] = useState<'landing' | 'analysis' | 'components'>('landing');
   const [chatOpen, setChatOpen] = useState(false);
   const [viewportInfo, setViewportInfo] = useState({
@@ -236,3 +236,5 @@ export function ResponsiveTestPage() {
     </SessionProvider>
   );
 }
+
+export default ResponsiveTestPage;

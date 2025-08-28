@@ -5,7 +5,7 @@ import type { CVAnalysisResult } from '../types';
 /**
  * Demo component to showcase the AnalysisResults components
  */
-export const AnalysisResultsDemo: React.FC = () => {
+const AnalysisResultsDemo: React.FC = () => {
   // Mock analysis data for demonstration
   const mockAnalysisData: CVAnalysisResult = {
     overall_score: 82,
@@ -87,3 +87,5 @@ export const AnalysisResultsDemo: React.FC = () => {
     </div>
   );
 };
+
+export default AnalysisResultsDemo;

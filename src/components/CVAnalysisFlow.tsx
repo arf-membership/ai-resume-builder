@@ -22,7 +22,7 @@ interface CVAnalysisFlowProps {
 
 export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
   const { sessionId } = useSession();
-  const { showError, showSuccess } = useNotifications();
+  const { showError } = useNotifications();
   const actions = useStoreActions();
   
   const [uploadedFile, setUploadedFile] = useState<{ resumeId: string; filePath: string } | null>(null);

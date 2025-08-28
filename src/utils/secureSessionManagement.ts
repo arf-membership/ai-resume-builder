@@ -4,7 +4,7 @@
  * Requirements: 9.1, 9.2
  */
 
-import { sanitizeTextInput, validateSessionId } from './inputSanitization';
+import { sanitizeTextInput } from './inputSanitization';
 
 export interface SecureSessionConfig {
   maxAge: number; // Session max age in milliseconds
@@ -57,7 +57,7 @@ function generateBrowserFingerprint(): string {
     screen.width + 'x' + screen.height,
     new Date().getTimezoneOffset(),
     navigator.hardwareConcurrency || 0,
-    navigator.deviceMemory || 0,
+    (navigator as any).deviceMemory || 0,
     canvas.toDataURL(),
   ].join('|');
   

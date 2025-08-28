@@ -6,7 +6,7 @@
 
 import { useSessionManagement } from '../hooks/useSessionManagement';
 
-export function SessionDemo() {
+function SessionDemo() {
   const {
     sessionId,
     sessionData,
@@ -109,3 +109,5 @@ export function SessionDemo() {
     </div>
   );
 }
+
+export default SessionDemo;

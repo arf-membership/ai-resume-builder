@@ -61,7 +61,6 @@ export function sanitizeTextInput(
       sanitized = DOMPurify.sanitize(sanitized, {
         ALLOWED_TAGS: allowedTags,
         ALLOWED_ATTR: ['href', 'target', 'rel'],
-        FORBID_SCRIPT: true,
         FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input'],
       });
     } else {
@@ -165,8 +164,8 @@ export function sanitizeFilename(filename: string): string {
     'Ó': 'O', 'Ò': 'O', 'Ô': 'O', 'Õ': 'O',
     'ú': 'u', 'ù': 'u', 'û': 'u',
     'Ú': 'U', 'Ù': 'U', 'Û': 'U',
-    'ñ': 'n', 'Ñ': 'N',
-    'ç': 'c', 'Ç': 'C'
+    'ñ': 'n', 'Ñ': 'N'
+    // Turkish characters already defined above
   };
 
   return filename

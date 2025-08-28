@@ -4,7 +4,7 @@
 
 import React from 'react';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { LoadingOverlay, UploadLoading, AnalysisLoading, EditingLoading, PDFGenerationLoading } from '../components/LoadingIndicator';
+import { UploadLoading, AnalysisLoading, EditingLoading, PDFGenerationLoading } from '../components/LoadingIndicator';
 import { useUploadState, useAnalysisState, useEditingState, usePDFState } from '../store';
 
 interface ErrorAndLoadingProviderProps {

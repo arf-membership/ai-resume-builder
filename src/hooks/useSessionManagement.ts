@@ -46,9 +46,10 @@ export function useSessionManagement(options: UseSessionManagementOptions = {}) 
     }
 
     // Enable session monitoring
-    if (enableMonitoring) {
-      const stopMonitoring = SessionMonitor.startMonitoring();
-      cleanupFunctions.push(stopMonitoring);
+    if (enableMonitoring && session.sessionData) {
+      // Start session monitoring if we have session data
+      SessionMonitor.startMonitoring(session.sessionData);
+      cleanupFunctions.push(() => SessionMonitor.stopMonitoring());
 
       // Listen for session validity changes
       const unsubscribe = SessionMonitor.addValidityListener((isValid) => {

@@ -14,7 +14,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   analysisData: initialAnalysisData,
   resumeId,
   onSectionEdit,
-  onDownloadPDF
+  onDownloadPDF: _onDownloadPDF
 }) => {
   const { sessionId } = useSession();
   const navigate = useNavigate();

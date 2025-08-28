@@ -13,7 +13,7 @@ import { generateChatSuggestions, type ChatSuggestion } from '../utils/chatSugge
 export const StreamingChatPage: React.FC = () => {
   const navigate = useNavigate();
   const { sessionId } = useSession();
-  const { showSuccess } = useNotifications();
+  const { showError: _showError } = useNotifications(); // Keep for future use
   
   // Get CV data from store
   const analysisResult = useCVStore(state => state.analysisResult);
@@ -24,7 +24,7 @@ export const StreamingChatPage: React.FC = () => {
   const hasProblematicIssues = suggestions.length > 0;
   
   // Track used suggestions per message to show remaining ones
-  const [usedSuggestions, setUsedSuggestions] = useState<Set<string>>(new Set());
+  const [, setUsedSuggestions] = useState<Set<string>>(new Set());
   const [suggestionsByMessage, setSuggestionsByMessage] = useState<{[messageIndex: number]: ChatSuggestion[]}>({});
   
   // Initialize suggestions for the first message
@@ -132,11 +132,11 @@ export const StreamingChatPage: React.FC = () => {
             <h1>${cvHeader.name || 'CV Candidate'}</h1>
             <h2>${cvHeader.title || 'Professional Title'}</h2>
             <div class="contact-info">
-              ${cvHeader.email ? `📧 ${cvHeader.email}` : ''}
-              ${cvHeader.phone ? ` • 📞 ${cvHeader.phone}` : ''}
-              ${cvHeader.location ? ` • 📍 ${cvHeader.location}` : ''}
-              ${cvHeader.linkedin ? ` • 💼 LinkedIn` : ''}
-              ${cvHeader.github ? ` • 💻 GitHub` : ''}
+              ${cvHeader.email ? `${cvHeader.email}` : ''}
+              ${cvHeader.phone ? ` • ${cvHeader.phone}` : ''}
+              ${cvHeader.location ? ` • ${cvHeader.location}` : ''}
+              ${cvHeader.linkedin ? ` • LinkedIn` : ''}
+              ${cvHeader.github ? ` • GitHub` : ''}
             </div>
           </div>
         ` : ''}
@@ -181,7 +181,7 @@ export const StreamingChatPage: React.FC = () => {
     }
   }, [scoreHistory.length]);
   
-  const { sectionUpdates } = useSectionEdit({
+  const { } = useSectionEdit({
     resumeId: currentResume?.id || '',
     sessionId: sessionId || undefined,
     initialAnalysisData: analysisResult || {} as any,
@@ -236,13 +236,16 @@ export const StreamingChatPage: React.FC = () => {
         console.log('⚠️ HTML content is short, creating from store data');
         
         // Get CV data from store
-        const { cvHeader, originalSections } = useCVStore.getState();
+        const state = useCVStore.getState();
+        const analysisResult = state.analysisResult;
         
-        if (!cvHeader && (!originalSections || originalSections.length === 0)) {
+        if (!analysisResult) {
           throw new Error('No CV content available for PDF generation');
         }
         
-        // Create simple HTML from store data
+        // Create simple HTML from store data  
+        const cvHeader = (analysisResult as any).cv_header;
+        const originalSections = (analysisResult as any).original_cv_sections || analysisResult.sections;
         const simpleHtml = createSimpleHTMLFromStore(cvHeader, originalSections);
         
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
@@ -408,7 +411,7 @@ export const StreamingChatPage: React.FC = () => {
           <title>Enhanced CV - ${new Date().toISOString().split('T')[0]}</title>
           <style>
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+              font-family: 'Segoe UI', Tahoma, Arial, 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
               font-size: 12px;
               line-height: 1.6;
               color: #333;
@@ -416,6 +419,11 @@ export const StreamingChatPage: React.FC = () => {
               margin: 0;
               padding: 20px;
               max-width: 800px;
+              -webkit-font-feature-settings: "liga" on, "kern" on;
+              font-feature-settings: "liga" on, "kern" on;
+              text-rendering: optimizeLegibility;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
             }
             
             .cv-header {
@@ -601,19 +609,19 @@ export const StreamingChatPage: React.FC = () => {
               <h1>${cvHeader.name || 'Professional CV'}</h1>
               <h2>${cvHeader.title || 'Software Developer'}</h2>
               <div class="contact-info">
-                ${cvHeader.email ? `<div class="contact-item">📧 ${cvHeader.email}</div>` : ''}
-                ${cvHeader.phone ? `<div class="contact-item">📞 ${cvHeader.phone}</div>` : ''}
-                ${cvHeader.location ? `<div class="contact-item">📍 ${cvHeader.location}</div>` : ''}
-                ${cvHeader.linkedin ? `<div class="contact-item">💼 LinkedIn</div>` : ''}
-                ${cvHeader.github ? `<div class="contact-item">💻 GitHub</div>` : ''}
+                ${cvHeader.email ? `<div class="contact-item">${cvHeader.email}</div>` : ''}
+                ${cvHeader.phone ? `<div class="contact-item">${cvHeader.phone}</div>` : ''}
+                ${cvHeader.location ? `<div class="contact-item">${cvHeader.location}</div>` : ''}
+                ${cvHeader.linkedin ? `<div class="contact-item">LinkedIn</div>` : ''}
+                ${cvHeader.github ? `<div class="contact-item">GitHub</div>` : ''}
               </div>
             </div>
           ` : ''}
           
           ${originalSections ? originalSections
-            .filter(section => section.section_name.toLowerCase() !== 'header')
-            .sort((a, b) => a.order - b.order)
-            .map(section => `
+            .filter((section: any) => section.section_name.toLowerCase() !== 'header')
+            .sort((a: any, b: any) => a.order - b.order)
+            .map((section: any) => `
               <div class="section">
                 <h3>${section.section_name}</h3>
                 <div class="section-content">${section.content}</div>

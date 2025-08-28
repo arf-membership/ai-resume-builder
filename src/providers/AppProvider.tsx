@@ -3,7 +3,7 @@
  * Initializes store, session management, and global error handling
  */
 
-import React, { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 
 interface AppProviderProps {
   children: ReactNode;
