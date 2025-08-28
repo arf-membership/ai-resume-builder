@@ -3,7 +3,7 @@
  * Modern landing page with professional design for hackathon submission
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { UploadZone } from './UploadZone';
 import { AnalysisResults } from './AnalysisResults';
 import { useSession } from '../contexts/SessionContext';
@@ -38,6 +38,21 @@ export function CVAnalysisFlow({ className = '' }: CVAnalysisFlowProps) {
 
   // Set showResults based on whether we have analysis data
   const showResults = Boolean(analysisResult && currentResume);
+
+  // Auto-scroll to results when returning to page with existing analysis
+  useEffect(() => {
+    if (showResults && analysisRef.current) {
+      // Small delay to ensure content is rendered
+      const timer = setTimeout(() => {
+        analysisRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showResults]);
 
   const handleUploadComplete = (fileData: { resumeId: string; filePath: string }) => {
     setUploadedFile(fileData);
