@@ -2,11 +2,19 @@
  * Shared types for Supabase Edge Functions
  */
 
+export interface ScoreImprovement {
+  previous_score: number;
+  new_score: number;
+  improvement: number;
+}
+
 export interface GlobalChatResponse {
   response: string;
   cv_updates: Record<string, string>;
   suggestions: string[];
   next_steps: string[];
+  score_improvements?: Record<string, ScoreImprovement>;
+  overall_score_improvement?: ScoreImprovement;
 }
 
 export interface ChatMessage {

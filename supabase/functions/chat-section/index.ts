@@ -23,6 +23,14 @@ interface ChatRequest {
   sessionId?: string;
   message: string;
   conversationHistory?: ChatMessage[];
+  currentOverallScore?: number;
+  currentSectionScores?: Record<string, number>;
+}
+
+interface ScoreImprovement {
+  previous_score: number;
+  new_score: number;
+  improvement: number;
 }
 
 interface ChatResponse {
@@ -30,6 +38,8 @@ interface ChatResponse {
   response?: string;
   cv_updates?: Record<string, string>;
   section_renames?: Record<string, string>;
+  score_improvements?: Record<string, ScoreImprovement>;
+  overall_score_improvement?: ScoreImprovement;
   error?: string;
   details?: string;
 }
@@ -49,7 +59,9 @@ async function handleCVImprovementChat({
   conversationHistory,
   currentCV,
   openaiService,
-  supabaseClient
+  supabaseClient,
+  currentOverallScore,
+  currentSectionScores
 }: {
   resumeId: string;
   sessionId?: string;
@@ -58,6 +70,8 @@ async function handleCVImprovementChat({
   currentCV: any;
   openaiService: any;
   supabaseClient: any;
+  currentOverallScore?: number;
+  currentSectionScores?: Record<string, number>;
 }): Promise<Response> {
   try {
     console.log('🔍 Processing CV improvement request with streaming:', { 
@@ -77,6 +91,9 @@ async function handleCVImprovementChat({
         content: `Current CV Analysis Data:
 ${JSON.stringify(currentCV, null, 2)}
 
+Current Overall Score: ${currentOverallScore || 'Not available'}
+Current Section Scores: ${JSON.stringify(currentSectionScores || {}, null, 2)}
+
 USER REQUEST: ${message}
 
 CRITICAL INSTRUCTIONS:
@@ -85,9 +102,19 @@ CRITICAL INSTRUCTIONS:
 3. If they mention "skills" or "technical skills", update the SKILLS or TECHNICAL SKILLS section
 4. If they mention "experience" or "work", update the EXPERIENCE section
 5. Return cv_updates with the EXACT section name that matches their request
-6. Do NOT use conversation history - focus only on this current request
+6. Calculate meaningful score improvements for updated sections
+7. Provide realistic score improvements (5-15 points for good improvements)
+8. Include overall score improvement if multiple sections or significant changes are made
+9. Do NOT use conversation history - focus only on this current request
 
-Please provide a conversational response and update the specific CV section mentioned in the user's request.`
+SCORE IMPROVEMENT GUIDELINES:
+- Minor improvements: 3-7 points
+- Moderate improvements: 5-12 points  
+- Major improvements: 8-15 points
+- Overall score should reflect weighted average of section improvements
+- Be realistic - don't give unrealistic jumps
+
+Please provide a conversational response, update the specific CV section mentioned, and include score improvements.`
       }
     ];
 
@@ -107,6 +134,7 @@ Please provide a conversational response and update the specific CV section ment
     let cvUpdates = {};
     let sectionRenames = {};
     let scoreImprovements = {};
+    let overallScoreImprovement: ScoreImprovement | undefined = undefined;
     let conversationalResponse = fullResponse;
     
     try {
@@ -114,6 +142,7 @@ Please provide a conversational response and update the specific CV section ment
       cvUpdates = parsedResponse.cv_updates || {};
       sectionRenames = parsedResponse.section_renames || {};
       scoreImprovements = parsedResponse.score_improvements || {};
+      overallScoreImprovement = parsedResponse.overall_score_improvement;
       conversationalResponse = parsedResponse.response || fullResponse;
     } catch (parseError) {
       console.warn('⚠️ Could not parse response, using raw response');
@@ -126,6 +155,7 @@ Please provide a conversational response and update the specific CV section ment
       cv_updates: cvUpdates,
       section_renames: sectionRenames,
       score_improvements: scoreImprovements,
+      overall_score_improvement: overallScoreImprovement,
       all_sections: currentCV.original_cv_sections || currentCV.sections || [],
       updated_sections: Object.keys(cvUpdates)
     };
@@ -184,7 +214,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Parse request
     const requestBody: ChatRequest = await req.json();
-    const { resumeId, sessionId, message, conversationHistory = [] } = requestBody;
+    const { 
+      resumeId, 
+      sessionId, 
+      message, 
+      conversationHistory = [],
+      currentOverallScore,
+      currentSectionScores
+    } = requestBody;
 
     console.log('📝 Request data:', { 
       resumeId, 
@@ -272,7 +309,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       conversationHistory,
       currentCV: analysisData,
       openaiService,
-      supabaseClient
+      supabaseClient,
+      currentOverallScore,
+      currentSectionScores
     });
 
   } catch (error) {

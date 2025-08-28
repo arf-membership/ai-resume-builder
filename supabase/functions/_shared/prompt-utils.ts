@@ -108,7 +108,7 @@ Guidelines:
 
 Use this exact format:
 {
-  "response": "I've improved your professional summary! It now highlights your skills more effectively. Would you like me to work on another section?",
+  "response": "I've improved your professional summary! It now highlights your skills more effectively and increased your score by 12 points. Would you like me to work on another section?",
   "cv_updates": {
     "Professional Summary": "Results-driven Software Developer with 1+ years of hands-on experience in designing, developing, and maintaining robust applications..."
   },
@@ -116,11 +116,16 @@ Use this exact format:
     "COURSEWORK/SKILLS": "TECHNICAL SKILLS"
   },
   "score_improvements": {
-    "professional_summary": {
+    "Professional Summary": {
       "previous_score": 65,
-      "new_score": 85,
-      "improvement": 20
+      "new_score": 77,
+      "improvement": 12
     }
+  },
+  "overall_score_improvement": {
+    "previous_score": 72,
+    "new_score": 75,
+    "improvement": 3
   }
 }
 

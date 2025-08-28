@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CVStructuredView } from './CVStructuredView';
+import { ScoreTimeline } from './ScoreTimeline';
 import { useCVStore } from '../store';
 import { useSession } from '../contexts/SessionContext';
 import { useSectionEdit } from '../hooks/useSectionEdit';
@@ -62,11 +63,13 @@ export const StreamingChatPage: React.FC = () => {
   // Local state for input and CV update status
   const [inputMessage, setInputMessage] = useState('');
   const [isUpdatingCV, setIsUpdatingCV] = useState(false);
+  const [isScoreUpdated, setIsScoreUpdated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Monitor for CV updates by watching the store
   const lastUpdated = useRef<number>(Date.now());
   const analysisResultSnapshot = useCVStore(state => state.analysisResult);
+  const scoreHistory = useCVStore(state => state.scoreHistory);
   
   useEffect(() => {
     if (analysisResultSnapshot) {
@@ -79,6 +82,15 @@ export const StreamingChatPage: React.FC = () => {
       lastUpdated.current = now;
     }
   }, [analysisResultSnapshot]);
+
+  // Monitor for score updates
+  useEffect(() => {
+    if (scoreHistory.length > 1) { // Only highlight if there are actual updates (not initial)
+      setIsScoreUpdated(true);
+      const timer = setTimeout(() => setIsScoreUpdated(false), 3000); // Highlight for 3 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [scoreHistory.length]);
   
   const { sectionUpdates } = useSectionEdit({
     resumeId: currentResume?.id || '',
@@ -120,13 +132,32 @@ export const StreamingChatPage: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-900 text-white">
-      {/* Left Side - Chat Interface */}
-      <div className="w-1/2 flex flex-col">
+      {/* Left Side - Score Timeline */}
+      <div className={`w-1/5 bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-500 ${
+        isScoreUpdated ? 'ring-2 ring-green-400 ring-opacity-75 shadow-lg shadow-green-400/20' : ''
+      }`}>
+        <div className={`p-4 border-b border-slate-700 flex-shrink-0 transition-all duration-500 ${
+          isScoreUpdated ? 'bg-green-900/20 border-green-500/30' : ''
+        }`}>
+          <h2 className={`text-lg font-semibold transition-colors duration-500 ${
+            isScoreUpdated ? 'text-green-300' : 'text-white'
+          }`}>
+            Score Progress {isScoreUpdated && <span className="ml-2 text-green-400">✨</span>}
+          </h2>
+          <p className="text-sm text-gray-400">Track your CV improvements</p>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <ScoreTimeline />
+        </div>
+      </div>
+
+      {/* Middle - Chat Interface */}
+      <div className="w-2/5 flex flex-col">
         {/* Header */}
         <div className="p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white">✨ AI CV Enhancement</h1>
-            <p className="text-sm text-gray-400">Real-time CV improvements with streaming AI</p>
+            <p className="text-sm text-gray-400">Get personalized CV improvements with AI assistance</p>
           </div>
           <div className="flex space-x-2">
             <button
@@ -254,7 +285,7 @@ export const StreamingChatPage: React.FC = () => {
                 {isStreaming && index === messages.length - 1 && message.role === 'assistant' && (
                   <div className="mt-2 flex items-center text-xs text-gray-400">
                     <div className="animate-pulse mr-2">●</div>
-                    Streaming response...
+                    Processing...
                   </div>
                 )}
               </div>
@@ -268,35 +299,21 @@ export const StreamingChatPage: React.FC = () => {
 
         {/* Input Area */}
         <div className="p-4 bg-slate-800 border-t border-slate-700">
-          <div className="flex space-x-3">
+          <div className="relative">
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask me to improve your CV... (e.g., 'Make my professional summary more compelling')"
-              className="flex-1 p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ask me to improve your CV... (Press Enter to send)"
+              className="w-full p-4 pr-16 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
               rows={2}
               disabled={isStreaming}
             />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isStreaming}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
-            >
-              {isStreaming ? (
-                <>
-                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  <span>Streaming...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                  <span>Send</span>
-                </>
-              )}
-            </button>
+            {isStreaming && (
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
           </div>
           
           {/* Quick Suggestions - only show if no AI message suggestions are present */}
@@ -330,21 +347,21 @@ export const StreamingChatPage: React.FC = () => {
       </div>
 
       {/* Right Side - Live CV Preview */}
-      <div className="w-1/2 bg-gray-100">
+      <div className="w-2/5 bg-gray-100">
         <div className="p-4 bg-slate-800 border-b border-slate-700">
           <h2 className="text-lg font-semibold text-white flex items-center">
             <div className={`w-3 h-3 rounded-full mr-2 ${
               isUpdatingCV 
                 ? 'bg-orange-500 animate-bounce' 
                 : isStreaming 
-                  ? 'bg-blue-500 animate-pulse' 
+                  ? 'bg-purple-500 animate-pulse' 
                   : 'bg-green-500 animate-pulse'
             }`}></div>
-            {isUpdatingCV ? 'Updating CV...' : isStreaming ? 'AI Thinking...' : 'Live CV Preview'}
+            {isUpdatingCV ? 'Updating CV...' : isStreaming ? 'AI Processing...' : 'Live CV Preview'}
           </h2>
           <p className="text-sm text-gray-400">
             {isUpdatingCV 
-              ? 'CV sections are being updated in real-time!' 
+              ? 'CV sections are being updated!' 
               : 'Watch your CV improve as you chat with AI'
             }
           </p>

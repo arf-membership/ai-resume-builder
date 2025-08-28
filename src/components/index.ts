@@ -9,6 +9,7 @@ export { AnalysisResults } from './AnalysisResults';
 export { CVAnalysisFlow } from './CVAnalysisFlow';
 export { SectionCard } from './SectionCard';
 export { ScoreDisplay } from './ScoreDisplay';
+export { ScoreTimeline } from './ScoreTimeline';
 export { OverallScoreDisplay } from './OverallScoreDisplay';
 export { ATSCompatibilityCard } from './ATSCompatibilityCard';
 export { AnalysisResultsDemo } from './AnalysisResultsDemo';

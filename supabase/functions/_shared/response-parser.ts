@@ -174,6 +174,7 @@ export interface GlobalChatResponse {
   cv_updates: Record<string, string>;
   section_renames?: Record<string, string>;
   score_improvements?: Record<string, ScoreImprovement>;
+  overall_score_improvement?: ScoreImprovement;
 }
 
 // Validation error class
@@ -824,7 +825,8 @@ export function parseGlobalChatResponse(response: string): GlobalChatResponse {
     response: typeof parsed.response === 'string' ? parsed.response.trim() : 'I understand your request. Let me help you improve your CV.',
     cv_updates: parsed.cv_updates && typeof parsed.cv_updates === 'object' ? parsed.cv_updates : {},
     section_renames: parsed.section_renames && typeof parsed.section_renames === 'object' ? parsed.section_renames : undefined,
-    score_improvements: parsed.score_improvements && typeof parsed.score_improvements === 'object' ? parsed.score_improvements : undefined
+    score_improvements: parsed.score_improvements && typeof parsed.score_improvements === 'object' ? parsed.score_improvements : undefined,
+    overall_score_improvement: parsed.overall_score_improvement && typeof parsed.overall_score_improvement === 'object' ? parsed.overall_score_improvement : undefined
   };
 
   if (result.response.length === 0) {

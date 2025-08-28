@@ -9,8 +9,19 @@ import type { AppState, ErrorState } from '../types/state';
 import type { CVAnalysisResult, CVSection } from '../types/cv';
 import type { ResumeRecord } from '../types/database';
 
+// Score history interface
+interface ScoreHistory {
+  timestamp: Date;
+  overall_score: number;
+  section_scores: Record<string, number>;
+  message?: string;
+}
+
 // Store interface extending AppState with actions
 interface CVStore extends AppState {
+  // Score tracking
+  scoreHistory: ScoreHistory[];
+  
   // Session actions
   initializeSession: () => void;
   clearSession: () => void;
@@ -31,6 +42,10 @@ interface CVStore extends AppState {
   updateSection: (sectionName: string, updatedSection: CVSection) => void;
   updateSectionContent: (sectionName: string, content: string) => void;
   renameSections: (sectionRenames: Record<string, string>) => void;
+  
+  // Score tracking actions
+  addScoreToHistory: (score: number, sectionScores: Record<string, number>, message?: string) => void;
+  clearScoreHistory: () => void;
   
   // Chat actions
   setChatOpen: (open: boolean) => void;
@@ -80,6 +95,7 @@ const initialState: AppState = {
 // Create the store without persistence to avoid conflicts with SessionContext
 export const useCVStore = create<CVStore>()((set, get) => ({
       ...initialState,
+      scoreHistory: [],
       
       // Session actions
       initializeSession: () => {
@@ -125,6 +141,31 @@ export const useCVStore = create<CVStore>()((set, get) => ({
           analysisResult: result,
           isAnalyzing: false,
         });
+        
+        // Add initial score to history
+        const sectionScores: Record<string, number> = {};
+        if (result.sections) {
+          result.sections.forEach(section => {
+            sectionScores[section.section_name] = section.score;
+          });
+        }
+        
+        // Get overall score from either schema format
+        const overallScore = ('overall_summary' in result) 
+          ? (result as any).overall_summary?.overall_score || 0
+          : result.overall_score || 0;
+        
+        console.log('🔍 Extracting overall score from analysis result:', {
+          hasOverallSummary: 'overall_summary' in result,
+          overallSummaryScore: (result as any).overall_summary?.overall_score,
+          directOverallScore: result.overall_score,
+          extractedScore: overallScore,
+          resultKeys: Object.keys(result)
+        });
+        
+        // Add to score history
+        const { addScoreToHistory } = get();
+        addScoreToHistory(overallScore, sectionScores, 'Initial CV Analysis');
         
         // Update current resume with analysis result
         const currentResume = get().currentResume;
@@ -523,11 +564,30 @@ export const useCVStore = create<CVStore>()((set, get) => ({
         }));
       },
       
+      // Score tracking actions
+      addScoreToHistory: (score: number, sectionScores: Record<string, number>, message?: string) => {
+        const newEntry: ScoreHistory = {
+          timestamp: new Date(),
+          overall_score: score,
+          section_scores: sectionScores,
+          message
+        };
+        
+        set(state => ({
+          scoreHistory: [...state.scoreHistory, newEntry]
+        }));
+      },
+      
+      clearScoreHistory: () => {
+        set({ scoreHistory: [] });
+      },
+      
       // Utility actions
       reset: () => {
         set({
           ...initialState,
           sessionId: generateSessionId(),
+          scoreHistory: [],
         });
       },
     }));
@@ -538,6 +598,7 @@ const currentResumeSelector = (state: CVStore) => state.currentResume;
 const analysisResultSelector = (state: CVStore) => state.analysisResult;
 const chatOpenSelector = (state: CVStore) => state.chatOpen;
 const errorsSelector = (state: CVStore) => state.errors;
+const scoreHistorySelector = (state: CVStore) => state.scoreHistory;
 
 // Selector hooks for specific state slices
 export const useSessionId = () => useCVStore(sessionIdSelector);
@@ -570,6 +631,7 @@ export const useEditingState = () => useCVStore(useShallow(editingStateSelector)
 export const useChatState = () => useCVStore(chatOpenSelector);
 export const usePDFState = () => useCVStore(useShallow(pdfStateSelector));
 export const useErrors = () => useCVStore(errorsSelector);
+export const useScoreHistory = () => useCVStore(scoreHistorySelector);
 
 // Memoized actions selector to prevent infinite loops
 const actionsSelector = (state: CVStore) => ({
@@ -604,6 +666,10 @@ const actionsSelector = (state: CVStore) => ({
   removeError: state.removeError,
   clearErrors: state.clearErrors,
   clearErrorsByType: state.clearErrorsByType,
+  
+  // Score tracking actions
+  addScoreToHistory: state.addScoreToHistory,
+  clearScoreHistory: state.clearScoreHistory,
   
   // Utility actions
   reset: state.reset,
