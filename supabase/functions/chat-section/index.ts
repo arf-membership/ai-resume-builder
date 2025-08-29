@@ -51,7 +51,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Handle CV improvement chat with JSON response
 async function handleCVImprovementChat({
   resumeId,
   sessionId,
